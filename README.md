@@ -8,7 +8,7 @@ This repository currently contains discovery notes and product specifications on
 
 ## Product Positioning
 
-The intended product is a guided procurement assistant that combines RAG with structured intake flows.
+This is not just an FAQ chatbot. The intended product is a guided procurement assistant that combines RAG with structured intake flows.
 
 Core behavior:
 - Answer procurement questions in plain language.
@@ -20,7 +20,7 @@ Core behavior:
 
 ## Initial Scope
 
-The MVP should support:
+The first version should support:
 - CSUB faculty and staff requesters buying goods, services, software, equipment, or subscriptions.
 - Vendors and suppliers trying to understand registration, onboarding, invoice, purchase order, and payment-related steps.
 - Internal support stakeholders who need consistent routing and source-backed guidance.
@@ -41,6 +41,7 @@ Likely implementation areas:
 - Document storage and ingestion.
 - Retrieval index / vector search.
 - Chat and orchestration API.
+- Authentication and authorization.
 - Logging, analytics, and feedback.
 - Admin tools for source management.
 - Static or server-rendered web frontend.
@@ -56,3 +57,13 @@ The repository should keep the product architecture modular enough to support:
 - [Discovery notes](docs/discovery-notes.md)
 - [Feature specification](docs/feature-spec.md)
 - [Open questions](docs/open-questions.md)
+
+## MVP Differentiators
+
+- Guided procurement pathfinder instead of only open-ended chat.
+- Dynamic pre-submission checklist for requesters.
+- Vendor onboarding and invoice guidance.
+- Source-cited answers with CSUB-specific priority over generic CSU material.
+- Video transcript and timestamp support when training videos are available.
+- Screenshot or walkthrough references where UI context matters.
+- Escalation routing when sources are missing, conflicting, or require human judgment.
