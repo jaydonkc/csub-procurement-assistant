@@ -40,7 +40,9 @@ The initial version should be guidance-only:
 
 The MVP AWS baseline is now established in account `335010339891`, region `us-west-2`. Amazon S3 is the source of truth for approved content, and an Amazon Bedrock managed Knowledge Base provides retrieval and citations. Application hosting and orchestration services remain intentionally unselected because the application itself has not been implemented.
 
-Live status as of July 14, 2026: the Knowledge Base is active, the canonical source bucket contains 16 approved documents, and one document has been indexed and retrieval-tested while 15 remain in progress with no reported failures. Because campus organization policy blocks the native S3 paths required here, the current baseline uses a managed custom connector and an explicit operator synchronization step.
+Live status as of July 14, 2026: the Knowledge Base is active and the old 16-document corpus has been replaced with all 80 real source files from `CSUBuyP2P`. All 63 PDF/DOCX files are text-indexed. All 17 MP4 files are stored in S3, and their 17 timestamped VTT transcripts are indexed and retrieval-tested. Because campus organization policy blocks the native S3 paths required here, the current baseline uses a managed custom connector and an explicit operator synchronization step.
+
+The current Knowledge Base intentionally includes internal/admin and sensitive-PII-access guidance from the supplied collection. Those sources carry `access_scope=internal` metadata, but the connector does not enforce ACLs. A public/no-auth application must enforce source filtering or use a separate restricted corpus before launch.
 
 See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
 
@@ -55,7 +57,7 @@ Likely implementation areas:
 
 MVP access model:
 - Public/no-auth web assistant.
-- Only sources approved for no-auth exposure should be indexed.
+- Only sources approved for no-auth exposure should be returned to public users.
 - Role selection is self-reported and used for guidance style, not authorization.
 
 The repository should keep the product architecture modular enough to support:

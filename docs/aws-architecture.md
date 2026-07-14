@@ -1,6 +1,6 @@
 # AWS Architecture: MVP Baseline
 
-Status: AWS content and retrieval baseline provisioned July 14, 2026. The Knowledge Base is active, and the initial corpus is still processing. The application has not been implemented.
+Status: AWS content and retrieval baseline provisioned July 14, 2026. The replacement `CSUBuyP2P` corpus is text-searchable, all video transcripts are indexed, and the application has not been implemented.
 
 ## Scope
 
@@ -8,9 +8,9 @@ Status: AWS content and retrieval baseline provisioned July 14, 2026. The Knowle
 - Region: `us-west-2`
 - AWS CLI profile: `summercamp`
 - Access model: AWS IAM Identity Center / SSO session; no raw or long-lived access keys
-- Product boundary: public, no-auth procurement guidance using public-approved sources only
+- Product direction: public, no-auth procurement guidance
 
-Public/no-auth describes the future user experience. It does not make the S3 bucket or Bedrock resources public. A future backend will call Bedrock with an IAM role.
+Public/no-auth describes the future user experience. It does not make the S3 bucket or Bedrock resources public. The current Knowledge Base contains mixed-scope material, including internal/admin guidance, so it must not be exposed directly to a public application without enforced filtering or corpus separation. A future backend will call Bedrock with an IAM role.
 
 ## Live Resources
 
@@ -30,14 +30,16 @@ The Bedrock source boundary is `approved/`. The separate bucket `dxhub-camp-2026
 
 Current layout:
 
-- `approved/documents/` - documents approved for the public/no-auth MVP
-- `approved/transcripts/` - future reviewed, timestamped transcripts
+- `approved/documents/` - 63 PDF/DOCX sources, preserving the `CSUBuyP2P` folder hierarchy
+- `approved/transcripts/` - 17 timestamped VTT transcripts used for video retrieval
+- `media/videos/` - 17 original MP4 sources; stored but not indexed directly
+- `transcription-output/raw/` - Amazon Transcribe job outputs retained for traceability
 - `incoming/` - future staging area; never directly indexed
 - `retired/` - future superseded content; never directly indexed
 
-Sixteen procurement documents from `customer-dataaisummercamp` were copied into `approved/documents/`. Two uploaded files represented versions of the same default-address guide; only the newer seven-page `csubuy_setting_default_address.pdf` was placed in the approved corpus.
+The canonical corpus was replaced with all 80 real source files in the local `CSUBuyP2P` collection: 63 documents and 17 videos. The macOS `.DS_Store` artifact was excluded. The local collection is ignored by Git and is not part of the repository.
 
-`customer-dataaisummercamp` is now an import/staging source, not the canonical source of truth for the MVP corpus. Future approved content should be managed in `csub-pa-mvp-source-335010339891-us-west-2`.
+The earlier 16-document corpus imported from `customer-dataaisummercamp` was deleted. Future source changes should be managed in `csub-pa-mvp-source-335010339891-us-west-2`.
 
 ### Retrieval
 
@@ -48,7 +50,9 @@ Sixteen procurement documents from `customer-dataaisummercamp` were copied into 
 - Service role: `AmazonBedrockExecutionRoleForKnowledgeBase_csub_pa_mvp`
 - Data source: `csub-pa-mvp-approved-direct` (`UEPVWR8BSS`)
 
-The managed Knowledge Base was selected because it keeps S3 as the source of truth while Bedrock manages embeddings, vector storage, indexing, and retrieval. The account's organization policy explicitly denies S3 Vectors and prevents Bedrock service roles from listing S3 buckets. Therefore, the source is synchronized through Bedrock's supported custom connector using the authenticated `summercamp` operator session instead of a native S3 crawler. The Knowledge Base service role has no S3 permissions. A native S3 crawler should not be assumed available unless the campus organization policy changes.
+The managed Knowledge Base was selected because it keeps S3 as the source of truth while Bedrock manages embeddings, vector storage, indexing, and retrieval. The account's organization policy explicitly denies S3 Vectors and prevents Bedrock service roles from listing S3 buckets. Therefore, the source is synchronized through Bedrock's supported custom connector using the authenticated `summercamp` operator session instead of a native S3 crawler. A native S3 crawler should not be assumed available unless the campus organization policy changes.
+
+The Bedrock role has a single inline permission: `s3:GetObject` for `approved/documents/*` and `approved/transcripts/*` in the canonical source bucket. It has no bucket-list permission, no access to `media/videos/`, and no access to the DXHub instruction bucket.
 
 ## Current Verification Status
 
@@ -56,31 +60,37 @@ Last verified July 14, 2026:
 
 - Knowledge Base status: `ACTIVE`
 - Data source status: `AVAILABLE`
-- Canonical approved corpus: 16 documents
-- Ingestion status: 1 `INDEXED`, 15 `IN_PROGRESS`, 0 `FAILED`, and 0 `IGNORED`
-- The indexed document is `Copy-of-Chartfield-Request-DOA-Form-2-22-22.xlsx`.
-- A retrieval test for chartfield and delegation-of-authority guidance returned grounded passages from that document. The result included the canonical S3 URI in its metadata and a best relevance score of `0.833`.
+- Canonical source corpus: 63 documents and 17 original videos
+- Video processing: 17 Amazon Transcribe jobs `COMPLETED`, 0 failed
+- Retrieval representations: 63 documents plus 17 timestamped VTT transcripts
+- Document state: all 63 report `TEXT_INDEXED` when checked directly and are text-searchable
+- Transcript state: all 17 report `INDEXED`
+- Retrieval tests returned the sensitive-PII guide, the internal supplier FAQ, and timestamped payment-terms video guidance with their replacement-corpus paths and S3 metadata.
 
-The remaining documents should not be treated as queryable until Bedrock reports them as `INDEXED`. Their current asynchronous processing state has no reported failure reason.
+The aggregate list API currently summarizes the 63 documents as `IN_PROGRESS` while optional image extraction continues, but direct status checks report `TEXT_INDEXED` and retrieval is working. Sixteen identifiers from the deleted corpus appear as `NOT_FOUND` deletion tombstones. For example, `approved/documents/VPAT_2.5_Nov2023.pdf` is intentionally absent from both S3 and the replacement collection; its `NOT_FOUND` row is not a failed new upload.
 
-## Ingestion Boundary
+## Content And Access Boundary
 
-- Index only material explicitly approved for public/no-auth exposure.
+- The current Knowledge Base includes every real file from `CSUBuyP2P` by explicit project direction.
+- This includes supplier material labeled internal, campus-admin guidance, and the sensitive-PII access guide.
+- Internal/admin/PII-related sources are tagged with `access_scope=internal` metadata where identified.
+- The custom connector has ACL enforcement disabled. Metadata tags do not prevent retrieval by themselves.
+- Before a public/no-auth application launches, enforce metadata filtering or separate internal sources into a restricted Knowledge Base.
 - Synchronize only objects under `approved/` through the custom connector.
-- Keep raw videos outside the indexed prefix.
-- Convert videos into reviewed transcripts with timestamp ranges before placing them under `approved/transcripts/`.
+- Keep raw videos under `media/videos/`, outside the indexed prefixes.
+- Convert videos into timestamped VTT transcripts before placing them under `approved/transcripts/`.
 - Treat requester, vendor, and internal-staff roles as guidance context, not authorization.
-- Do not add restricted, personalized, supplier-specific, invoice-specific, or payment-specific records to this Knowledge Base.
+- Do not add personalized supplier, invoice, payment, requester, or transaction records to this Knowledge Base.
 
 ## Source Synchronization
 
 The custom connector does not automatically crawl S3. Until a different ingestion path is approved, source updates should follow this operating sequence:
 
 1. Place candidate material under `incoming/`.
-2. Review it for authority, currency, duplication, and public/no-auth suitability.
-3. Promote approved documents or timestamped transcripts into the appropriate `approved/` prefix.
-4. Submit the approved object to the custom connector using an authenticated `summercamp` session.
-5. Wait for `INDEXED` status, then run a small retrieval-and-citation check before relying on the source.
+2. Review it for authority, currency, duplication, access scope, and intended audience.
+3. Promote approved documents into `approved/documents/`; store original videos under `media/videos/` and promote their timestamped VTT output into `approved/transcripts/`.
+4. Submit the approved document or transcript to the custom connector using an authenticated `summercamp` session. The Bedrock role reads only the approved object.
+5. Confirm `TEXT_INDEXED` or `INDEXED` status, then run a small retrieval-and-citation check before relying on the source.
 6. When retiring or replacing content, update both the canonical S3 corpus and the corresponding custom-connector document state.
 
 The owner of this approval and synchronization process is still an open governance decision. Event-driven or scheduled synchronization remains deferred.
@@ -92,7 +102,8 @@ The owner of this approval and synchronization process is still an open governan
 - Public endpoint rate limiting and abuse controls
 - Application logs, analytics, and feedback storage
 - Authentication for any future restricted or personalized workflows
-- Automated video transcription and ingestion pipeline
+- Enforced separation or filtering of internal content before public launch
+- Automated video transcription and ingestion pipeline; the current 17-video batch was operator-run
 - Scheduled or event-driven Knowledge Base synchronization
 
 No AWS Budgets or Cost Anomaly Detection resources are part of this baseline.
