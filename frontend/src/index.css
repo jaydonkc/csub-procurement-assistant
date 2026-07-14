@@ -1,0 +1,36 @@
+.app {
+  max-width: 800px;
+  margin: 40px auto;
+  font-family: Arial, sans-serif;
+}
+
+.chat-box {
+  border: 1px solid #ccc;
+  padding: 16px;
+  min-height: 400px;
+  margin-bottom: 16px;
+}
+
+.user {
+  text-align: right;
+  margin: 10px 0;
+}
+
+.assistant {
+  text-align: left;
+  margin: 10px 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+input {
+  flex: 1;
+  padding: 10px;
+}
+
+button {
+  padding: 10px 16px;
+}
