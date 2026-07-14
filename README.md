@@ -8,7 +8,7 @@ This repository currently contains discovery notes and product specifications on
 
 ## Product Positioning
 
-This is not just an FAQ chatbot. The intended product is a guided procurement assistant that combines RAG with structured intake flows.
+The intended product is a guided procurement assistant that combines RAG with structured intake flows.
 
 Core behavior:
 - Answer procurement questions in plain language.
