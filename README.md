@@ -26,12 +26,15 @@ The first version should support:
 - Internal support stakeholders who need consistent routing and source-backed guidance.
 
 The initial version should be guidance-only:
+- No authentication or user accounts.
 - No requisition submission.
 - No purchase approval.
 - No write-back into ServiceNow.
 - No write-back into CFS.
 - No supplier registration submission.
+- No personalized requisition, supplier, invoice, or payment lookup.
 - No unsupported policy advice without source grounding.
+- No restricted/internal-only sources unless they are explicitly approved for no-auth public use.
 
 ## Expected Architecture Direction
 
@@ -41,10 +44,17 @@ Likely implementation areas:
 - Document storage and ingestion.
 - Retrieval index / vector search.
 - Chat and orchestration API.
-- Authentication and authorization.
+- Source access-level tagging.
 - Logging, analytics, and feedback.
 - Admin tools for source management.
 - Static or server-rendered web frontend.
+
+MVP access model:
+- Public/no-auth web assistant.
+- No Cognito, SSO, or user account requirement.
+- Only sources approved for no-auth exposure should be indexed.
+- Role selection is self-reported and used for guidance style, not authorization.
+- Personalized or restricted workflows require a future authenticated phase.
 
 The repository should keep the product architecture modular enough to support:
 - A standalone full-page web assistant first.
