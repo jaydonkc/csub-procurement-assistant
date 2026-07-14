@@ -51,10 +51,8 @@ Likely implementation areas:
 
 MVP access model:
 - Public/no-auth web assistant.
-- No Cognito, SSO, or user account requirement.
 - Only sources approved for no-auth exposure should be indexed.
 - Role selection is self-reported and used for guidance style, not authorization.
-- Personalized or restricted workflows require a future authenticated phase.
 
 The repository should keep the product architecture modular enough to support:
 - A standalone full-page web assistant first.
