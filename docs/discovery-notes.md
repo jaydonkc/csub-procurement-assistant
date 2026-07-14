@@ -4,6 +4,18 @@ Sources reviewed:
 - `/Users/jaydon/Downloads/DiscoveryCall-Transcript.vtt`
 - `/Users/jaydon/Downloads/SubmissionForm.pdf`
 - `/Users/jaydon/Downloads/DiscoveryCall.mp4` was present, but the transcript covered the relevant discovery segment.
+- `/Users/jaydon/Downloads/challenge_overview.md`
+
+## Challenge Submission Metadata
+
+- Challenge: AI Purchasing and Procurement Assistant.
+- University: California State University, Bakersfield.
+- Sponsor: Chris Diniz, Associate Vice President and Chief Information Officer.
+- Sponsor email: cdiniz@csub.edu.
+- Sample or synthetic data available: yes. The submission defines data broadly, including website content, PDFs, Excel files, databases, and other resources needed to solve the problem.
+- Challenge context: CSU Summer AI Camp 2026, a five-day Learn by Doing hackathon in San Luis Obispo, California, with final team pitches.
+- Review context: proposals are reviewed by DXHub staff from Cal Poly and AWS.
+- Case study permission: with customer approval, DxHub may post short open-source case studies for selected challenges.
 
 ## Executive Summary
 
@@ -33,6 +45,8 @@ Secondary users implied by the call:
 - Student workers or departments requesting student worker access.
 - Technology purchasers who may need Solutions Consulting review.
 - Buyers who need to understand vendor onboarding, invoices, commodity codes, existing contracts, or delegation-of-authority thresholds.
+- Vendors and suppliers who need registration, purchase order, invoice, payment, or onboarding guidance.
+- Internal procurement/process users if the product later expands beyond the requester-facing flow.
 
 ## Problem Statement
 
@@ -48,6 +62,8 @@ CSUB purchasing requires users to understand multiple process decisions before s
 - How to get access to the system, including access for student workers.
 
 The problem is not lack of documentation. The customer repeatedly emphasized that there is a lot of documentation, training, PDFs, videos, and process material. The problem is that users do not know how to consume it quickly, how to find the relevant portion, or how to translate it into the next step for their specific situation.
+
+The current tooling is constrained by CSU-mandated systems: CSUBUY/P2P is a Chancellor's Office standard, requisitions are handled through the P2P ServiceNow portal, and CFS remains part of the broader environment. The solution should guide users through those systems rather than replacing them.
 
 ## Direct Customer Evidence
 
@@ -173,6 +189,7 @@ Knowledge base ingestion:
 - Technology purchase / Solutions Consulting review guidance.
 - Training videos, ideally YouTube links or raw MP4s.
 - Screenshots from manuals and video walkthroughs.
+- Common how-to questions and recurring Procurement support topics.
 
 Administrative functions:
 - Document upload or repository sync workflow.
@@ -401,4 +418,3 @@ What it is not for MVP:
 - Is there a current approved-software list and technology review checklist we can ingest?
 - Are supplier registration and contract lookup available as static exports for MVP?
 - What AWS environment constraints or services should the team assume?
-

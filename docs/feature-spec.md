@@ -2,7 +2,7 @@
 
 ## Product Definition
 
-The solution is a requester-facing RAG chatbot and guided procurement assistant for CSUB faculty and staff. It helps users determine the correct purchasing path in CSUBUY/P2P, understand required approvals and supplier steps, find the right forms, and navigate procurement guidance without reading long PDFs or watching full training videos.
+The solution is a standalone, role-aware RAG chatbot and guided procurement assistant for CSUB requesters, vendors, and internal support stakeholders. It helps users determine the correct purchasing path in CSUBUY/P2P, understand required approvals and supplier steps, find the right forms, and navigate procurement guidance without reading long PDFs or watching full training videos.
 
 The MVP is a guidance layer only. It does not submit requisitions, modify ServiceNow, write to CFS, approve purchases, or replace Procurement staff.
 
@@ -11,6 +11,7 @@ The MVP is a guidance layer only. It does not submit requisitions, modify Servic
 - Faculty and staff who initiate purchases.
 - Infrequent requesters who do not know where to start.
 - Department staff supporting purchasing workflows.
+- Vendors and suppliers who need registration, purchase order, invoice, payment, and onboarding guidance.
 - Procurement, AP, Supplier Management, ITS, and Solutions Consulting as support and escalation stakeholders.
 
 ## MVP Feature Set
@@ -49,6 +50,35 @@ Acceptance criteria:
 - Given a common procurement question, the assistant returns an actionable answer in under 10 seconds.
 - Every policy-based answer includes at least one citation.
 - The assistant does not answer from unsupported policy assumptions when no source is found.
+
+### F1A. Role Selection And Role-Aware Guidance
+
+Priority: Must have
+
+User need:
+Requesters, vendors, and internal staff need different language, source exposure, and escalation paths.
+
+Roles:
+- Requester: CSUB faculty, staff, department admin, or student worker support context.
+- Vendor: supplier or vendor trying to register, understand purchase orders, submit invoices, or resolve payment questions.
+- Internal staff: Procurement, Accounts Payable, Supplier Management, ITS, Solutions Consulting, or approver support.
+
+Behavior:
+- Let the user identify their role at the start or infer role from the question.
+- Use role-specific wording and escalation paths.
+- Avoid exposing internal-only documents to vendors unless approved.
+- Keep requester, vendor, and internal process flows separate enough to extend independently.
+
+Output:
+- Role-aware answer.
+- Role-specific next steps.
+- Role-specific escalation target.
+- Citations appropriate for that role.
+
+Acceptance criteria:
+- A vendor registration question receives vendor-facing guidance, not requester-facing internal purchasing instructions.
+- A requester buying question receives purchase path and checklist guidance.
+- Internal-only or restricted sources are not exposed to vendors unless marked safe.
 
 ### F2. Source-Grounded RAG Retrieval
 
@@ -171,7 +201,7 @@ Content sources:
 - Top Procurement questions.
 - High-frequency chatbot queries.
 - Known rework/rejection causes.
-- Access, vendor registration, invoices, approvals, software purchases, and forms.
+- Access, vendor registration, invoices, approvals, software purchases, payment questions, and forms.
 
 Behavior:
 - Display common question categories.
@@ -300,6 +330,37 @@ Output:
 Acceptance criteria:
 - MVP does not claim live requisition status unless integration exists.
 - Status guidance is grounded in source documentation.
+
+### F9A. Vendor Onboarding And Invoice Guidance
+
+Priority: Must have if vendors are in first-version scope
+
+User need:
+Vendors need clear guidance on supplier registration, purchase orders, invoices, payment questions, and who to contact when onboarding stalls.
+
+Inputs:
+- Vendor status: new supplier, existing supplier, invited to register, invoice issue, payment question, or purchase order question.
+- Known identifiers if available: purchase order number, invoice number, supplier name, or requester contact.
+
+Behavior:
+- Explain supplier registration steps using approved sources.
+- Explain where invoice or payment questions should go.
+- Distinguish vendor-facing guidance from requester/internal guidance.
+- Route unresolved supplier setup issues to Supplier Management.
+- Route invoice/payment issues to Accounts Payable when appropriate.
+- Avoid exposing internal procurement-only materials to vendors unless approved.
+
+Output:
+- Vendor-facing step-by-step guidance.
+- Required information or documents.
+- Responsible office.
+- Source citations.
+- Escalation path.
+
+Acceptance criteria:
+- A new vendor can understand what to do next without reading internal procurement documentation.
+- Vendor invoice questions route to AP or the correct source-backed process.
+- The assistant does not expose restricted internal guidance to vendors.
 
 ### F10. Admin Knowledge Base Management
 
@@ -488,10 +549,12 @@ Expected assistant behavior:
 
 Must have:
 - Plain-language procurement chat.
+- Role selection and role-aware guidance.
 - Source-grounded RAG retrieval.
 - Guided procurement pathfinder.
 - Dynamic pre-submission checklist.
 - Escalation routing.
+- Vendor onboarding and invoice guidance, if vendors remain in first-version scope.
 
 Should have:
 - FAQ/common questions page.
@@ -517,4 +580,3 @@ The prototype should be considered successful if it can:
 - Avoid unsupported answers and escalate ambiguous cases.
 - Summarize relevant training content without requiring full video viewing.
 - Demonstrate reduced need for repetitive Procurement hand-holding.
-
