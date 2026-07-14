@@ -33,9 +33,11 @@
 
 ## AWS And Implementation
 
-- Which AWS account or campus environment will host the prototype?
-- Are there preferred AWS services for retrieval, chat orchestration, authentication, storage, logging, or deployment?
-- Are Bedrock, OpenSearch, S3, Lambda, ECS, or App Runner approved for this project?
+- Resolved: the prototype uses AWS account `335010339891` in `us-west-2`, accessed through CLI profile `summercamp`.
+- Resolved for content and retrieval: private Amazon S3 source storage plus an Amazon Bedrock managed Knowledge Base.
+- Resolved for the current account policy: S3 Vectors and the native Bedrock S3 crawler path are unavailable, so approved objects are submitted through a managed custom connector using an authenticated `summercamp` operator session.
+- Still open for the later application phase: chat orchestration, API runtime, frontend hosting, logging, and deployment services.
+- Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
 - Which source types are approved for no-auth public exposure?
 - What authentication model would be required in a future phase for restricted sources or personalized status lookup?

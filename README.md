@@ -36,9 +36,13 @@ The initial version should be guidance-only:
 - No unsupported policy advice without source grounding.
 - No restricted/internal-only sources unless they are explicitly approved for no-auth public use.
 
-## Expected Architecture Direction
+## AWS Architecture Baseline
 
-The project is expected to use AWS for a significant part of the implementation. Final AWS service choices are still open.
+The MVP AWS baseline is now established in account `335010339891`, region `us-west-2`. Amazon S3 is the source of truth for approved content, and an Amazon Bedrock managed Knowledge Base provides retrieval and citations. Application hosting and orchestration services remain intentionally unselected because the application itself has not been implemented.
+
+Live status as of July 14, 2026: the Knowledge Base is active, the canonical source bucket contains 16 approved documents, and one document has been indexed and retrieval-tested while 15 remain in progress with no reported failures. Because campus organization policy blocks the native S3 paths required here, the current baseline uses a managed custom connector and an explicit operator synchronization step.
+
+See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
 
 Likely implementation areas:
 - Document storage and ingestion.
@@ -64,6 +68,7 @@ The repository should keep the product architecture modular enough to support:
 
 - [Discovery notes](docs/discovery-notes.md)
 - [Feature specification](docs/feature-spec.md)
+- [AWS architecture](docs/aws-architecture.md)
 - [Open questions](docs/open-questions.md)
 
 ## MVP Differentiators
