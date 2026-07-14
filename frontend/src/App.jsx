@@ -10,19 +10,34 @@ function App() {
     const userText = input
     setInput("")
 
-    setMessages(prev => [...prev, { sender: "user", text: userText }
-    ])
+    setMessages(prev => [...prev, { sender: "user", text: userText }])
 
-    const response = await fetch("http://127.0.0.1:5000/chat", {
-      method: "POST",
-      headers: {"Content-Type": "application/json",},
-      body: JSON.stringify({ message: userText }),
-    })
+    try {
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userText,
+        }),
+      })
 
-    const data = await response.json()
+      console.log("Response status:", response.status)
 
-    setMessages(prev => [...prev, { sender: "assistant", text: data.answer }
-    ])
+      const data = await response.json()
+      console.log("Backend response:", data)
+
+      // Add the assistant's response
+      setMessages(prev => [...prev, { sender: "assistant", text: data.answer }])
+    } catch (error) {
+      console.error("Error calling backend:", error)
+
+      setMessages(prev => [...prev,{
+        sender: "assistant",
+        text: "Error connecting to backend.",
+      },])
+    }
   }
 
   return (
