@@ -33,10 +33,7 @@ function App() {
     } catch (error) {
       console.error("Error calling backend:", error)
 
-      setMessages(prev => [...prev,{
-        sender: "assistant",
-        text: "Error connecting to backend.",
-      },])
+      setMessages(prev => [...prev,{sender: "assistant", text: "Error connecting to backend.",},])
     }
   }
 

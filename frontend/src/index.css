@@ -1,36 +1,132 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #212121;
+  color: #ececec;
+}
+
 .app {
   max-width: 800px;
-  margin: 40px auto;
-  font-family: Arial, sans-serif;
+  height: 100vh;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #212121;
+  color: #ececec;
+  box-sizing: border-box;
+}
+
+.app h1 {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 20px;
 }
 
 .chat-box {
-  border: 1px solid #ccc;
-  padding: 16px;
-  min-height: 400px;
+  flex: 1;
+  border: 1px solid #3a3a3a;
+  border-radius: 16px;
+  background-color: #2a2a2a;
+  padding: 20px;
   margin-bottom: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.chat-box:empty::before {
+  content: "Hello! Here to help?";
+  margin: auto;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #9b9b9b;
+}
+
+
+.user,
+.assistant {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  margin: 6px 0;
+  line-height: 1.5;
+  font-size: 0.95rem;
+  word-wrap: break-word;
 }
 
 .user {
-  text-align: right;
-  margin: 10px 0;
+  align-self: flex-end;
+  text-align: left;
+  background-color: #3a3a3a;
+  color: #ececec;
+  border-bottom-right-radius: 4px;
 }
 
 .assistant {
+  align-self: flex-start;
   text-align: left;
-  margin: 10px 0;
+  background-color: transparent;
+  color: #ececec;
+  padding-left: 0;
 }
+
+.user strong,
+.assistant strong {
+  display: block;
+  font-size: 0.75rem;
+  color: #9b9b9b;
+  margin-bottom: 2px;
+}
+
+/* ===== Input row ===== */
 
 .input-row {
   display: flex;
   gap: 8px;
+  background-color: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 24px;
+  padding: 6px 6px 6px 16px;
 }
 
 input {
   flex: 1;
-  padding: 10px;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ececec;
+  font-size: 0.95rem;
+}
+
+input::placeholder {
+  color: #9b9b9b;
 }
 
 button {
-  padding: 10px 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 18px;
+  background-color: #ececec;
+  color: #212121;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+button:hover {
+  background-color: #ffffff;
+}
+
+button:active {
+  background-color: #d4d4d4;
 }
