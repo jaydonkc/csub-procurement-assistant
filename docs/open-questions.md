@@ -4,7 +4,7 @@
 
 - Should the first prototype include both free-form chat and guided pathfinder flows?
 - Which workflows are mandatory for the first demo: requester buying path, vendor onboarding, invoice help, access help, or technology/software review?
-- Should requisition status be limited to "how to check status" guidance, or should live read-only status lookup be pursued later?
+- Which status promises are in the first demo: public "how to check status" guidance, authenticated read-only requester lookup, authenticated vendor/supplier lookup, or all of these?
 - Should the assistant present itself as a standalone CSUB Procurement Assistant, or should it be related to Rowdy only by integration/linking?
 
 ## Users And Roles
@@ -13,6 +13,8 @@
 - Are vendors allowed to access the same assistant as CSUB employees?
 - Should answers change based on self-reported role, department, or campus affiliation?
 - Are student worker access rules safe to expose in a no-auth public assistant?
+- Which identity provider should authenticate requesters, vendors, and internal staff: campus SSO, AWS Cognito, ServiceNow identity, CSUBUY/P2P identity, or another approved model?
+- What authorization rules determine which requisitions, supplier records, invoices, purchase orders, or payment statuses each role may see?
 
 ## Source Access
 
@@ -38,8 +40,8 @@
 - Resolved for the current account policy: S3 Vectors and the native Bedrock S3 crawler path are unavailable, so approved objects are submitted through a managed custom connector using an authenticated `summercamp` operator session.
 - Resolved for the current corpus: all 80 real files from `CSUBuyP2P` are in canonical S3 storage; 63 documents are text-indexed through source-aware fixed-size chunking and all 17 videos are covered by 300 indexed timestamped segments derived from the canonical VTT transcripts.
 - Resolved for replacement status: the 16 `NOT_FOUND` identifiers were deletion tombstones in the retired Knowledge Base, not failed replacement uploads; they are not part of the active chunked index.
-- Resolved for the production agent runtime: Lambda version `4` is frozen behind the `production` alias, with Sonnet 4.6 generation, Haiku 4.5 citation validation, and versions `2` and `1` retained for rollback.
-- Resolved for the public boundary: deterministic gates block system actions, live lookups, internal/admin procedures, PII access, prompt injection, and explicit out-of-scope topics; self-reported role is not authorization.
+- Resolved for the production agent runtime: Lambda version `14` is frozen behind the `production` alias, with Sonnet 4.6 generation, Haiku 4.5 retrieval routing and citation validation, version `13` as its immediate predecessor, and version `8` retaining the first document/video source-link implementation.
+- Resolved for the public boundary: deterministic gates block system actions, unauthenticated live lookups, internal/admin procedures, PII access, prompt injection, and explicit out-of-scope topics; self-reported role is not authorization.
 - Resolved for backend ingress: API Gateway `w0vfga8dil` exposes versioned chat and health routes; WAF, request validation, throttling, CORS, 30-day privacy-safe logs, X-Ray, alarms, and a CloudWatch dashboard are active. Direct Lambda URLs are IAM-only.
 - Resolved for repeatability: CloudFormation stack `csub-pa-production-backend` and `scripts/deploy_backend.sh` manage the backend and require grounded pre-alias and post-alias smoke tests.
 - Resolved for frontend hosting: `https://d3s79ehfkh7xjx.cloudfront.net` serves the production build through CloudFront distribution `E1J3M2Y5JS6LMM` from a private S3 origin. Stack `csub-pa-production-frontend` and `scripts/deploy_frontend.sh` manage repeatable deployment.
@@ -49,7 +51,7 @@
 - Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
 - Which source types are approved for no-auth public exposure?
-- What authentication model would be required in a future phase for restricted sources or personalized status lookup?
+- What authentication, authorization, audit logging, and source-system integration are required for personalized requester/vendor status lookup in MVP?
 
 ## Evaluation
 
