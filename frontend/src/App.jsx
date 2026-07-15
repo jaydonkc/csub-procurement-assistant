@@ -11,6 +11,7 @@ import {
   Headphones,
   Laptop,
   PackageCheck,
+  PanelRightOpen,
   Store,
   UserRound,
   UserRoundCog,
@@ -155,7 +156,6 @@ function SourceList({ sources, onSelectSource, selectedSourceKey }) {
           const key = sourceKey(source)
           const videoSource = isVideoSource(source)
           const SourceIcon = videoSource ? FileVideo2 : FileText
-          const href = videoSource ? '' : source.source_url || source.media_url || ''
           const content = (
             <>
               <SourceIcon size={16} aria-hidden="true" />
@@ -171,35 +171,17 @@ function SourceList({ sources, onSelectSource, selectedSourceKey }) {
               {videoSource ? (
                 <CirclePlay size={16} aria-hidden="true" />
               ) : (
-                <ExternalLink size={16} aria-hidden="true" />
+                <PanelRightOpen size={16} aria-hidden="true" />
               )}
             </>
           )
-
-          if (href) {
-            return (
-              <a
-                className={`source-row ${selectedSourceKey === key ? 'is-active' : ''}`}
-                href={href}
-                key={key}
-                target="_blank"
-                rel="noopener noreferrer"
-                referrerPolicy="no-referrer"
-                title={`Open ${source.path} in a new tab`}
-                onClick={() => onSelectSource(source)}
-                aria-current={selectedSourceKey === key ? 'true' : undefined}
-              >
-                {content}
-              </a>
-            )
-          }
 
           return (
             <button
               className={`source-row ${selectedSourceKey === key ? 'is-active' : ''}`}
               key={key}
               type="button"
-              title={`Preview ${source.path}`}
+              title={`View ${source.path}`}
               onClick={() => onSelectSource(source)}
               aria-pressed={selectedSourceKey === key}
             >
