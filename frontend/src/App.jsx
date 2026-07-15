@@ -3,13 +3,18 @@ import ReactMarkdown from 'react-markdown'
 import {
   ArrowUp,
   Building2,
+  Clock3,
+  CirclePlay,
+  ExternalLink,
   FileText,
+  FileVideo2,
   Headphones,
   Laptop,
   PackageCheck,
   Store,
   UserRound,
   UserRoundCog,
+  X,
 } from 'lucide-react'
 import csubLogoHeader from './assets/csub-logo-header.png'
 
@@ -50,6 +55,56 @@ function sourceName(path = 'CSUB procurement source') {
   return path.split('/').pop() || path
 }
 
+function sourceKey(source) {
+  return `${source.id}-${source.path}-${source.timestamp || ''}`
+}
+
+function isVideoSource(source) {
+  return (
+    source.kind === 'video_transcript' ||
+    source.path?.toLowerCase().endsWith('.mp4')
+  )
+}
+
+function timestampToSeconds(timestamp) {
+  const match = /^(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)$/.exec(timestamp?.trim())
+  if (!match) return null
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
+}
+
+function parseTimestampRange(timestamp = '') {
+  const [startLabel, endLabel] = (timestamp || '').split(/\s*-->\s*/)
+  const start = timestampToSeconds(startLabel)
+  const end = timestampToSeconds(endLabel)
+  return {
+    start,
+    end,
+    startLabel: start === null ? '' : startLabel,
+    endLabel: end === null ? '' : endLabel,
+  }
+}
+
+function formatPlaybackTime(seconds) {
+  if (!Number.isFinite(seconds)) return ''
+  const wholeSeconds = Math.floor(seconds)
+  const hours = Math.floor(wholeSeconds / 3600)
+  const minutes = Math.floor((wholeSeconds % 3600) / 60)
+  const remainder = wholeSeconds % 60
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+    : `${minutes}:${String(remainder).padStart(2, '0')}`
+}
+
+function playbackUrl(source, range) {
+  const sourceUrl = source.source_url || source.media_url
+  if (!sourceUrl) return ''
+  const baseUrl = sourceUrl.split('#')[0]
+  if (range.start === null) return baseUrl
+  const start = range.start.toFixed(3)
+  const end = range.end === null ? '' : `,${range.end.toFixed(3)}`
+  return `${baseUrl}#t=${start}${end}`
+}
+
 async function fetchJson(url, options = {}, timeoutMs = CHAT_TIMEOUT_MS) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
@@ -86,7 +141,7 @@ async function fetchJson(url, options = {}, timeoutMs = CHAT_TIMEOUT_MS) {
   }
 }
 
-function SourceList({ sources }) {
+function SourceList({ sources, onSelectSource, selectedSourceKey }) {
   if (!sources?.length) return null
 
   return (
@@ -95,24 +150,173 @@ function SourceList({ sources }) {
         <FileText size={15} aria-hidden="true" />
         <span>{sources.length === 1 ? 'Source' : 'Sources'}</span>
       </div>
-      {sources.map((source) => (
-        <div
-          className="source-row"
-          key={`${source.id}-${source.path}`}
-          title={source.path}
-        >
-          <span className="source-id">{source.id}</span>
-          <span className="source-name">{sourceName(source.path)}</span>
-          {source.timestamp && (
-            <span className="source-time">{source.timestamp}</span>
-          )}
-        </div>
-      ))}
+      <div className="source-items">
+        {sources.map((source) => {
+          const key = sourceKey(source)
+          const videoSource = isVideoSource(source)
+          const SourceIcon = videoSource ? FileVideo2 : FileText
+          const href = videoSource ? '' : source.source_url || source.media_url || ''
+          const content = (
+            <>
+              <SourceIcon size={16} aria-hidden="true" />
+              <span className="source-copy">
+                <span className="source-title-row">
+                  <span className="source-id">{source.id}</span>
+                  <span className="source-name">{sourceName(source.path)}</span>
+                </span>
+                {source.timestamp && (
+                  <span className="source-time">{source.timestamp}</span>
+                )}
+              </span>
+              {videoSource ? (
+                <CirclePlay size={16} aria-hidden="true" />
+              ) : (
+                <ExternalLink size={16} aria-hidden="true" />
+              )}
+            </>
+          )
+
+          if (href) {
+            return (
+              <a
+                className={`source-row ${selectedSourceKey === key ? 'is-active' : ''}`}
+                href={href}
+                key={key}
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
+                title={`Open ${source.path} in a new tab`}
+                onClick={() => onSelectSource(source)}
+                aria-current={selectedSourceKey === key ? 'true' : undefined}
+              >
+                {content}
+              </a>
+            )
+          }
+
+          return (
+            <button
+              className={`source-row ${selectedSourceKey === key ? 'is-active' : ''}`}
+              key={key}
+              type="button"
+              title={`Preview ${source.path}`}
+              onClick={() => onSelectSource(source)}
+              aria-pressed={selectedSourceKey === key}
+            >
+              {content}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-function AssistantMessage({ message }) {
+function SourcePanel({ source, onClose }) {
+  const range = parseTimestampRange(source.timestamp)
+  const videoSource = isVideoSource(source)
+  const videoUrl = playbackUrl(source, range)
+  const externalUrl = videoSource
+    ? videoUrl
+    : source.source_url || source.media_url || ''
+
+  function preloadTimestamp(event) {
+    if (range.start === null) return
+    const player = event.currentTarget
+    const lastSeekableSecond = Number.isFinite(player.duration)
+      ? Math.max(player.duration - 0.01, 0)
+      : range.start
+    player.currentTime = Math.min(range.start, lastSeekableSecond)
+  }
+
+  return (
+    <aside className="source-panel" aria-labelledby="source-panel-title">
+      <div className="source-panel-header">
+        <div>
+          <span className="source-kicker">Source {source.id}</span>
+          <h2 id="source-panel-title">{sourceName(source.path)}</h2>
+        </div>
+        <div className="source-panel-actions">
+          {externalUrl && (
+            <a
+              className="source-open"
+              href={externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+              aria-label={`Open ${sourceName(source.path)} in a new tab`}
+              title="Open in new tab"
+            >
+              <ExternalLink size={19} aria-hidden="true" />
+            </a>
+          )}
+          <button
+            className="source-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close source panel"
+            title="Close source panel"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="source-panel-body">
+        {videoSource ? (
+          <>
+            {videoUrl ? (
+              <video
+                className="source-video"
+                key={videoUrl}
+                src={videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                onLoadedMetadata={preloadTimestamp}
+                aria-label={`Video source: ${sourceName(source.path)}`}
+              />
+            ) : (
+              <div className="video-unavailable">
+                <FileVideo2 size={28} aria-hidden="true" />
+                <span>Video preview is unavailable.</span>
+              </div>
+            )}
+
+            {range.start !== null && (
+              <div className="segment-callout">
+                <Clock3 size={17} aria-hidden="true" />
+                <div>
+                  <span>Cited segment</span>
+                  <strong>
+                    {formatPlaybackTime(range.start)}
+                    {range.end !== null && ` - ${formatPlaybackTime(range.end)}`}
+                  </strong>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="document-preview">
+            <FileText size={30} aria-hidden="true" />
+            <span>Document source</span>
+          </div>
+        )}
+
+        <div className="source-details">
+          <span>Source path</span>
+          <p>{source.path}</p>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function AssistantMessage({
+  message,
+  onSelectSource,
+  selectedSourceKey,
+}) {
   return (
     <article className="message assistant-message">
       <div className="assistant-mark" aria-hidden="true">
@@ -123,7 +327,11 @@ function AssistantMessage({ message }) {
         <div className="markdown">
           <ReactMarkdown>{message.text}</ReactMarkdown>
         </div>
-        <SourceList sources={message.sources} />
+        <SourceList
+          sources={message.sources}
+          onSelectSource={onSelectSource}
+          selectedSourceKey={selectedSourceKey}
+        />
       </div>
     </article>
   )
@@ -134,6 +342,7 @@ function App() {
   const [role, setRole] = useState('requester')
   const [messages, setMessages] = useState([])
   const [isSending, setIsSending] = useState(false)
+  const [selectedSource, setSelectedSource] = useState(null)
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
   const sendInFlightRef = useRef(false)
@@ -152,6 +361,7 @@ function App() {
     }))
 
     setInput('')
+    setSelectedSource(null)
     sendInFlightRef.current = true
     setIsSending(true)
     setMessages((previous) => [
@@ -220,8 +430,12 @@ function App() {
       </header>
 
       <main className="workspace">
-        <section className="assistant-panel" aria-label="Procurement assistant">
-          <div className="role-bar">
+        <section
+          className={`assistant-panel ${selectedSource ? 'has-source-panel' : ''}`}
+          aria-label="Procurement assistant"
+        >
+          <div className="assistant-main">
+            <div className="role-bar">
             <span className="role-label">I am a</span>
             <div className="role-options" aria-label="Choose your role">
               {roles.map(({ id, label, Icon }) => (
@@ -237,9 +451,9 @@ function App() {
                 </button>
               ))}
             </div>
-          </div>
+            </div>
 
-          <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
+            <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
             {messages.length === 0 ? (
               <div className="welcome">
                 <div className="welcome-mark" aria-hidden="true">
@@ -266,7 +480,14 @@ function App() {
               <div className="message-list" aria-live="polite">
                 {messages.map((message) =>
                   message.sender === 'assistant' ? (
-                    <AssistantMessage key={message.id} message={message} />
+                    <AssistantMessage
+                      key={message.id}
+                      message={message}
+                      onSelectSource={setSelectedSource}
+                      selectedSourceKey={
+                        selectedSource ? sourceKey(selectedSource) : ''
+                      }
+                    />
                   ) : (
                     <article className="message user-message" key={message.id}>
                       <div className="message-content">
@@ -295,9 +516,9 @@ function App() {
                 <div ref={chatEndRef} />
               </div>
             )}
-          </div>
+            </div>
 
-          <form className="composer-area" onSubmit={handleSubmit}>
+            <form className="composer-area" onSubmit={handleSubmit}>
             <div className="composer">
               <textarea
                 ref={inputRef}
@@ -328,7 +549,15 @@ function App() {
               Guidance only. This demo cannot access, submit, approve, or change
               live procurement records.
             </p>
-          </form>
+            </form>
+          </div>
+
+          {selectedSource && (
+            <SourcePanel
+              source={selectedSource}
+              onClose={() => setSelectedSource(null)}
+            />
+          )}
         </section>
       </main>
     </div>
