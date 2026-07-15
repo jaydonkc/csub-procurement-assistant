@@ -15,6 +15,7 @@ from backend.config import (
 
 Role = Literal["requester", "vendor", "internal_staff"]
 HistoryRole = Literal["user", "assistant"]
+RetrievalRoute = Literal["conversation", "clarification", "out_of_scope", "retrieve"]
 
 
 class HistoryItem(BaseModel):
@@ -85,6 +86,22 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[SourceCard] = Field(default_factory=list)
     request_id: str
+
+
+class RetrievalDecision(BaseModel):
+    """Typed output from the pre-retrieval router."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    route: RetrievalRoute
+    reply: str = Field(default="", max_length=MAX_MESSAGE_LENGTH)
+    search_query: str = Field(default="", max_length=MAX_MESSAGE_LENGTH)
+    reason: str = Field(default="model_decision", max_length=80)
+
+    @field_validator("reply", "search_query", "reason", mode="before")
+    @classmethod
+    def normalize_router_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").split()).strip()
 
 
 GroundingReason = Literal[

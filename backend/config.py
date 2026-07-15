@@ -11,6 +11,7 @@ VALIDATOR_MODEL_ID = os.environ.get(
     "VALIDATOR_MODEL_ID",
     "us.anthropic.claude-haiku-4-5-20251001-v1:0",
 )
+ROUTER_MODEL_ID = os.environ.get("ROUTER_MODEL_ID", VALIDATOR_MODEL_ID)
 
 MAX_BODY_BYTES = 64_000
 MAX_MESSAGE_LENGTH = 4_000

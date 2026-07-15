@@ -86,6 +86,11 @@ GENERAL_HOWTO_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+LEADING_PLEASANTRY_PATTERN = re.compile(
+    r"^\s*(?:(?:hi|hello|hey|thanks|thank you|good (?:morning|afternoon|evening))\b[\s,!?.:;-]*)+",
+    re.IGNORECASE,
+)
+
 LIVE_OBJECT_PATTERN = re.compile(
     r"\b(?:requisition|purchase order|po|invoice|voucher|supplier|vendor|payment|transaction)\b",
     re.IGNORECASE,
@@ -127,10 +132,14 @@ def _contains_pattern(text: str, patterns: tuple[str, ...]) -> bool:
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
 
+def _without_leading_pleasantry(message: str) -> str:
+    return LEADING_PLEASANTRY_PATTERN.sub("", message).strip()
+
+
 def _is_action_request(message: str) -> bool:
     if not ACTION_PATTERN.search(message):
         return False
-    return not GENERAL_HOWTO_PATTERN.search(message.strip())
+    return not GENERAL_HOWTO_PATTERN.search(_without_leading_pleasantry(message))
 
 
 def _is_live_lookup(message: str) -> bool:
@@ -138,7 +147,7 @@ def _is_live_lookup(message: str) -> bool:
         LIVE_OBJECT_PATTERN.search(message) and LIVE_LOOKUP_PATTERN.search(message)
     ):
         return False
-    if GENERAL_HOWTO_PATTERN.search(message.strip()) and not re.search(
+    if GENERAL_HOWTO_PATTERN.search(_without_leading_pleasantry(message)) and not re.search(
         r"\b\d{4,}\b|\bmy\b", message, re.IGNORECASE
     ):
         return False
