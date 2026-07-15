@@ -216,7 +216,10 @@ Governance:
 - The assistant should be guidance-only for MVP.
 
 Security and access:
-- Some documentation is public, but campus-specific repositories may need restricted access.
+- MVP is a no-auth public guidance assistant.
+- Only documents approved for no-auth exposure should be indexed for MVP.
+- Role selection is self-reported and should shape guidance, not grant access to restricted content.
+- Internal-only, restricted, user-specific, supplier-specific, invoice-specific, and payment-specific data should remain out of scope unless a future authenticated phase is approved.
 - If future requisition status lookup is added, authentication and authorization will be required.
 - For MVP, avoid write-back to ServiceNow or CFS.
 
@@ -248,6 +251,7 @@ Data issues to handle:
 Build a retrieval-augmented procurement guidance assistant focused on CSUB requester questions.
 
 MVP scope:
+- Public/no-auth web assistant.
 - Static-source chatbot over vetted CSUB and CSU procurement materials.
 - Strong source citations.
 - CSUB-over-CSU source prioritization.
@@ -255,7 +259,8 @@ MVP scope:
 - Video transcript ingestion with timestamp citation where available.
 - Screenshot/reference support for guides or videos where visuals clarify the next step.
 - No write-back to ServiceNow or CFS.
-- Requisition status guidance limited to "how to check status" unless read-only integration is explicitly available.
+- No personalized requisition, supplier, invoice, or payment lookup.
+- Requisition status guidance limited to "how to check status" unless a future authenticated read-only integration is explicitly approved.
 
 MVP user flow:
 1. User asks a procurement question in plain language.

@@ -26,25 +26,41 @@ The first version should support:
 - Internal support stakeholders who need consistent routing and source-backed guidance.
 
 The initial version should be guidance-only:
+- No authentication or user accounts.
 - No requisition submission.
 - No purchase approval.
 - No write-back into ServiceNow.
 - No write-back into CFS.
 - No supplier registration submission.
+- No personalized requisition, supplier, invoice, or payment lookup.
 - No unsupported policy advice without source grounding.
+- No restricted/internal-only sources unless they are explicitly approved for no-auth public use.
 
-## Expected Architecture Direction
+## AWS Architecture Baseline
 
-The project is expected to use AWS for a significant part of the implementation. Final AWS service choices are still open.
+The MVP AWS baseline is established in account `335010339891`, region `us-west-2`. Amazon S3 is the source of truth for approved content, and an Amazon Bedrock managed Knowledge Base provides retrieval. A minimal Lambda-based test chatbot is deployed; production hosting and orchestration remain intentionally unselected.
 
-Likely implementation areas:
+Live status as of July 14, 2026: the Knowledge Base is active and the old 16-document corpus has been replaced with all 80 real source files from `CSUBuyP2P`. All 63 PDF/DOCX files are text-indexed. All 17 MP4 files are stored in S3, and their 17 timestamped VTT transcripts are indexed and retrieval-tested. Because campus organization policy blocks the native S3 paths required here, the current baseline uses a managed custom connector and an explicit operator synchronization step.
+
+The current Knowledge Base intentionally includes internal/admin and sensitive-PII-access guidance from the supplied collection. Those sources carry `access_scope=internal` metadata, but the connector does not enforce ACLs. A public/no-auth application must enforce source filtering or use a separate restricted corpus before launch.
+
+Test the guided assistant at [CSUB Procurement Assistant — AWS test](https://pzj5r4vybxqqdl5xfkpy7b5r7i0sytwy.lambda-url.us-west-2.on.aws/). The test endpoint filters internal metadata, excludes admin and approval collections, refuses PII-access guidance, cannot perform live transaction lookups, and returns source paths and video timestamps with answers.
+
+See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
+
+Production implementation areas still open:
 - Document storage and ingestion.
 - Retrieval index / vector search.
 - Chat and orchestration API.
-- Authentication and authorization.
+- Source access-level tagging.
 - Logging, analytics, and feedback.
 - Admin tools for source management.
 - Static or server-rendered web frontend.
+
+MVP access model:
+- Public/no-auth web assistant.
+- Only sources approved for no-auth exposure should be returned to public users.
+- Role selection is self-reported and used for guidance style, not authorization.
 
 The repository should keep the product architecture modular enough to support:
 - A standalone full-page web assistant first.
@@ -56,6 +72,7 @@ The repository should keep the product architecture modular enough to support:
 
 - [Discovery notes](docs/discovery-notes.md)
 - [Feature specification](docs/feature-spec.md)
+- [AWS architecture](docs/aws-architecture.md)
 - [Open questions](docs/open-questions.md)
 
 ## MVP Differentiators
