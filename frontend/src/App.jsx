@@ -67,6 +67,10 @@ function isVideoSource(source) {
   )
 }
 
+function isPdfSource(source) {
+  return source.path?.toLowerCase().endsWith('.pdf')
+}
+
 function timestampToSeconds(timestamp) {
   const match = /^(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)$/.exec(timestamp?.trim())
   if (!match) return null
@@ -278,10 +282,18 @@ function SourcePanel({ source, onClose }) {
               </div>
             )}
           </>
+        ) : isPdfSource(source) && externalUrl ? (
+          <iframe
+            className="source-pdf"
+            key={externalUrl}
+            src={externalUrl}
+            title={`PDF source: ${sourceName(source.path)}`}
+            referrerPolicy="no-referrer"
+          />
         ) : (
           <div className="document-preview">
             <FileText size={30} aria-hidden="true" />
-            <span>Document source</span>
+            <span>Preview unavailable for this file type.</span>
           </div>
         )}
 

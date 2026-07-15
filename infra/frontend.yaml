@@ -71,6 +71,7 @@ Resources:
               connect-src 'self' https://w0vfga8dil.execute-api.us-west-2.amazonaws.com;
               font-src 'self' data: https://fonts.gstatic.com;
               form-action 'self';
+              frame-src 'self' https://csub-pa-mvp-source-335010339891-us-west-2.s3.amazonaws.com;
               frame-ancestors 'none';
               img-src 'self' data:;
               media-src 'self' https://csub-pa-mvp-source-335010339891-us-west-2.s3.amazonaws.com;
