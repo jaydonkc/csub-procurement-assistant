@@ -38,8 +38,10 @@
 - Resolved for the current account policy: S3 Vectors and the native Bedrock S3 crawler path are unavailable, so approved objects are submitted through a managed custom connector using an authenticated `summercamp` operator session.
 - Resolved for the current corpus: all 80 real files from `CSUBuyP2P` are in canonical S3 storage; 63 documents are text-indexed and 17 videos are represented by indexed timestamped transcripts.
 - Resolved for replacement status: the 16 `NOT_FOUND` identifiers are deletion tombstones from the removed corpus, not failed replacement uploads.
-- Still open for the later application phase: chat orchestration, API runtime, frontend hosting, logging, and deployment services.
-- How will the public application enforce `access_scope` filtering, or should internal/admin sources move to a separate restricted Knowledge Base before launch?
+- Resolved for AWS-native testing: `csub-pa-mvp-chat-test` serves a public guided interface and uses managed retrieval plus Nova Lite generation.
+- Resolved for the public test boundary: internal metadata, admin and approval paths, and PII-access requests are excluded from generation; live transaction lookup is unsupported.
+- Still open for production: API and frontend hosting, custom domain/CDN, WAF and rate limiting, analytics, feedback storage, and infrastructure-as-code.
+- Should internal/admin sources move to a separate restricted Knowledge Base before production launch?
 - Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
 - Which source types are approved for no-auth public exposure?

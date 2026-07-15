@@ -38,15 +38,17 @@ The initial version should be guidance-only:
 
 ## AWS Architecture Baseline
 
-The MVP AWS baseline is now established in account `335010339891`, region `us-west-2`. Amazon S3 is the source of truth for approved content, and an Amazon Bedrock managed Knowledge Base provides retrieval and citations. Application hosting and orchestration services remain intentionally unselected because the application itself has not been implemented.
+The MVP AWS baseline is established in account `335010339891`, region `us-west-2`. Amazon S3 is the source of truth for approved content, and an Amazon Bedrock managed Knowledge Base provides retrieval. A minimal Lambda-based test chatbot is deployed; production hosting and orchestration remain intentionally unselected.
 
 Live status as of July 14, 2026: the Knowledge Base is active and the old 16-document corpus has been replaced with all 80 real source files from `CSUBuyP2P`. All 63 PDF/DOCX files are text-indexed. All 17 MP4 files are stored in S3, and their 17 timestamped VTT transcripts are indexed and retrieval-tested. Because campus organization policy blocks the native S3 paths required here, the current baseline uses a managed custom connector and an explicit operator synchronization step.
 
 The current Knowledge Base intentionally includes internal/admin and sensitive-PII-access guidance from the supplied collection. Those sources carry `access_scope=internal` metadata, but the connector does not enforce ACLs. A public/no-auth application must enforce source filtering or use a separate restricted corpus before launch.
 
+Test the guided assistant at [CSUB Procurement Assistant — AWS test](https://pzj5r4vybxqqdl5xfkpy7b5r7i0sytwy.lambda-url.us-west-2.on.aws/). The test endpoint filters internal metadata, excludes admin and approval collections, refuses PII-access guidance, cannot perform live transaction lookups, and returns source paths and video timestamps with answers.
+
 See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
 
-Likely implementation areas:
+Production implementation areas still open:
 - Document storage and ingestion.
 - Retrieval index / vector search.
 - Chat and orchestration API.
