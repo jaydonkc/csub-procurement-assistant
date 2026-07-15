@@ -7,16 +7,17 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# root 
 @app.get("/")
 def homepage():
     return jsonify({"service": "CSUB Procurement Assistant API", "status": "ok"})
 
-
+# health check
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
 
-
+# place to chat
 @app.post("/chat")
 def chat():
     data = request.get_json(silent=True) or {}
@@ -31,7 +32,6 @@ def chat():
             f"You asked: {user_message}"
         )
     })
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
