@@ -1,45 +1,53 @@
 import { useState, useEffect, useRef } from 'react'
-import './App.css'
 
 function App() {
-  const [input, setInput] = useState("")
-  const[messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState([])
+  const [isSending, setIsSending] = useState(false)
   const chatBoxRef = useRef(null)
-    useEffect(() => {
+
+  useEffect(() => {
     if (chatBoxRef.current) {
       chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight
     }
   }, [messages])
+
   async function sendMessage() {
-    if (!input.trim()) return
+    const userText = input.trim()
+    if (!userText || isSending) return
 
-    const userText = input
-    setInput("")
+    setInput('')
+    setIsSending(true)
 
-    setMessages(prev => [...prev, { sender: "user", text: userText }])
+    setMessages((prev) => [...prev, { sender: 'user', text: userText }])
 
     try {
-      const response = await fetch("/chat", {
-        method: "POST",
+      const response = await fetch('/chat', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           message: userText,
         }),
       })
 
-      console.log("Response status:", response.status)
-
       const data = await response.json()
-      console.log("Backend response:", data)
+      if (!response.ok) {
+        throw new Error(data.error || 'Request failed')
+      }
 
-      // Add the assistant's response
-      setMessages(prev => [...prev, { sender: "assistant", text: data.answer }])
+      setMessages((prev) => [...prev, { sender: 'assistant', text: data.answer }])
     } catch (error) {
-      console.error("Error calling backend:", error)
-
-      setMessages(prev => [...prev,{sender: "assistant", text: "Error connecting to backend.",},])
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'assistant',
+          text: error.message || 'Error connecting to backend.',
+        },
+      ])
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -50,7 +58,7 @@ function App() {
       <div className="chat-box" ref={chatBoxRef}>
         {messages.map((msg, index) => (
           <div key={index} className={msg.sender}>
-            <strong>{msg.sender === "user" ? "You" : "Assistant"}:</strong> {msg.text}
+            <strong>{msg.sender === 'user' ? 'You' : 'Assistant'}:</strong> {msg.text}
           </div>
         ))}
       </div>
@@ -61,11 +69,13 @@ function App() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a procurement question..."
           onKeyDown={(e) => {
-            if (e.key === "Enter") sendMessage()
+            if (e.key === 'Enter') sendMessage()
           }}
         />
 
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={sendMessage} disabled={isSending}>
+          {isSending ? 'Sending' : 'Send'}
+        </button>
       </div>
     </div>
   )
