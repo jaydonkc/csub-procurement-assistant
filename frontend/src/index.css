@@ -51,7 +51,7 @@ button {
 
 .site-header {
   min-height: 72px;
-  padding: 0 32px 0 0;
+  padding: 0 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -69,8 +69,8 @@ button {
 }
 
 .brand-logo {
-  width: 262px;
-  max-width: 52vw;
+  width: 238px;
+  max-width: 46vw;
   height: auto;
   flex: 0 1 auto;
   display: block;
@@ -92,52 +92,6 @@ button {
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.demo-badge {
-  flex: 0 0 auto;
-  padding: 6px 9px;
-  color: var(--csub-navy);
-  background: var(--csub-gold);
-  border-radius: 4px;
-  font-size: 0.72rem;
-  font-family: "Oswald", Arial, sans-serif;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.header-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.service-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #cbd2df;
-  box-shadow: 0 0 0 3px rgba(203, 210, 223, 0.14);
-}
-
-.service-status.is-online .status-dot {
-  background: #70d69a;
-  box-shadow: 0 0 0 3px rgba(112, 214, 154, 0.17);
-}
-
-.service-status.is-unavailable .status-dot {
-  background: #ff9d91;
-  box-shadow: 0 0 0 3px rgba(255, 157, 145, 0.16);
 }
 
 .workspace {
@@ -585,7 +539,7 @@ a:focus-visible {
 @media (max-width: 720px) {
   .site-header {
     min-height: 64px;
-    padding: 0 18px 0 0;
+    padding: 0 18px;
   }
 
   .brand-lockup {
@@ -593,20 +547,12 @@ a:focus-visible {
   }
 
   .brand-logo {
-    width: 232px;
-    max-width: 70vw;
+    width: 186px;
+    max-width: 54vw;
   }
 
   .product-name {
     font-size: 0.86rem;
-  }
-
-  .demo-badge {
-    font-size: 0.62rem;
-  }
-
-  .service-status {
-    font-size: 0.65rem;
   }
 
   .workspace {
@@ -689,10 +635,6 @@ a:focus-visible {
 @media (max-width: 460px) {
   .brand-divider,
   .product-name {
-    display: none;
-  }
-
-  .demo-badge {
     display: none;
   }
 
