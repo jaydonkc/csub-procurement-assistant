@@ -28,6 +28,7 @@ MAX_HISTORY_ITEMS = 6
 MAX_HISTORY_ITEM_LENGTH = 2_000
 MAX_CONTEXT_EXCERPTS = 8
 MAX_CHUNKS_PER_SOURCE = 2
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
 _agent_runtime = None
 _bedrock_runtime = None
@@ -256,6 +257,10 @@ def response(status_code: int, body: Any, content_type: str = "application/json"
     headers = {
         "content-type": f"{content_type}; charset=utf-8",
         "cache-control": "no-store",
+        "access-control-allow-origin": ALLOWED_ORIGIN,
+        "access-control-allow-methods": "GET,POST,OPTIONS",
+        "access-control-allow-headers": "content-type",
+        "access-control-max-age": "300",
         "x-content-type-options": "nosniff",
         "x-frame-options": "DENY",
         "referrer-policy": "no-referrer",
@@ -267,6 +272,22 @@ def response(status_code: int, body: Any, content_type: str = "application/json"
         ),
     }
     return {"statusCode": status_code, "headers": headers, "body": body}
+
+
+def request_method(event: dict[str, Any]) -> str:
+    """Read the HTTP method from Lambda URL, HTTP API, or REST API events."""
+    request_context = event.get("requestContext") or {}
+    http_context = request_context.get("http") or {}
+    return str(http_context.get("method") or event.get("httpMethod") or "GET").upper()
+
+
+def request_path(event: dict[str, Any]) -> str:
+    """Read and normalize the request path across API Gateway event versions."""
+    request_context = event.get("requestContext") or {}
+    http_context = request_context.get("http") or {}
+    path = http_context.get("path") or event.get("rawPath") or event.get("path") or "/"
+    normalized = "/" + str(path).strip().lstrip("/")
+    return normalized.rstrip("/") or "/"
 
 
 def parse_body(event: dict[str, Any]) -> dict[str, Any]:
@@ -911,9 +932,24 @@ def _log(event: str, request_id: str, **fields: Any) -> None:
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     request_id = _request_id(context)
-    method = ((event.get("requestContext") or {}).get("http") or {}).get("method", "GET")
-    if method == "GET":
+    method = request_method(event)
+    path = request_path(event)
+    if method == "OPTIONS" and path in {"/v1/chat", "/v1/health"}:
+        return response(204, "", "text/plain")
+    if method == "GET" and path == "/v1/health":
+        return response(
+            200,
+            {
+                "status": "ok",
+                "service": "csub-procurement-assistant",
+                "version": os.environ.get("AWS_LAMBDA_FUNCTION_VERSION", "$LATEST"),
+                "request_id": request_id,
+            },
+        )
+    if method == "GET" and path == "/":
         return response(200, INDEX_HTML, "text/html")
+    if method == "POST" and path not in {"/", "/v1/chat"}:
+        return response(404, {"error": "Not found", "request_id": request_id})
     if method != "POST":
         return response(405, {"error": "Method not allowed", "request_id": request_id})
     try:

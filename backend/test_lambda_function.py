@@ -328,6 +328,42 @@ class GroundingTests(unittest.TestCase):
 
 
 class HandlerTests(unittest.TestCase):
+    def test_rest_api_chat_event_is_supported(self):
+        event = {
+            "httpMethod": "POST",
+            "path": "/v1/chat",
+            "body": json.dumps({"message": "I need to buy software.", "role": "requester"}),
+        }
+        result = app.handler(event, None)
+        self.assertEqual(result["statusCode"], 200)
+        self.assertIn("estimated amount", json.loads(result["body"])["answer"])
+
+    def test_versioned_health_endpoint_does_not_call_bedrock(self):
+        event = {"httpMethod": "GET", "path": "/v1/health"}
+        with patch.object(app, "_clients", side_effect=AssertionError("must not call Bedrock")):
+            result = app.handler(event, None)
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["service"], "csub-procurement-assistant")
+
+    def test_unknown_post_path_is_rejected(self):
+        event = {
+            "httpMethod": "POST",
+            "path": "/v1/admin",
+            "body": json.dumps({"message": "Hello", "role": "requester"}),
+        }
+        result = app.handler(event, None)
+        self.assertEqual(result["statusCode"], 404)
+
+    def test_preflight_is_supported_for_versioned_routes(self):
+        result = app.handler({"httpMethod": "OPTIONS", "path": "/v1/chat"}, None)
+        self.assertEqual(result["statusCode"], 204)
+        self.assertEqual(result["headers"]["access-control-allow-origin"], "*")
+
+    def test_path_is_normalized(self):
+        self.assertEqual(app.request_path({"rawPath": "/v1/chat/"}), "/v1/chat")
+
     def test_fixed_gate_does_not_call_retrieval(self):
         with patch.object(app, "retrieve_sources", side_effect=AssertionError("must not retrieve")):
             result = app.handler(
@@ -368,6 +404,7 @@ class HandlerTests(unittest.TestCase):
         result = app.handler({"requestContext": {"http": {"method": "GET"}}}, None)
         self.assertEqual(result["statusCode"], 200)
         self.assertIn("frame-ancestors 'none'", result["headers"]["content-security-policy"])
+        self.assertEqual(result["headers"]["access-control-allow-origin"], "*")
 
 
 if __name__ == "__main__":

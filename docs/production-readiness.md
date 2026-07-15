@@ -1,19 +1,33 @@
 # Agent Production Readiness
 
-Status: production agent behavior verified July 14, 2026. This status covers the guidance agent and its AWS runtime. It does not claim that custom campus web hosting, WAF, analytics, or authenticated internal workflows are complete.
+Status: backend and production agent behavior verified July 15, 2026. The remaining launch work is frontend integration, an approved domain, and governance choices that cannot be inferred from the technical implementation.
 
 ## Frozen Runtime
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `2`
-- Production URL: `https://etwxpbmxee2s6vniis3sgez5m40vorpg.lambda-url.us-west-2.on.aws/`
-- Rollback: version `1`
+- Version: `4`
+- API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
+- Chat: `POST /v1/chat`
+- Health: `GET /v1/health`
+- Rollback versions: `2`, then `1`
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
 
-The mutable `$LATEST` URL is retained for pre-release testing. Production clients should use the alias URL so later development cannot silently change deployed behavior.
+API Gateway invokes only the immutable `production` alias. The `$LATEST` and alias Lambda Function URLs remain available for authenticated operator diagnostics but use `AuthType=AWS_IAM`; anonymous callers receive `403` and cannot bypass the protected API.
+
+## Production Ingress And Operations
+
+- Regional REST API `w0vfga8dil` with JSON-schema request validation and versioned routes.
+- API Gateway throttling at 5 requests per second with a burst of 10.
+- Regional WAF with a 64,000-byte body limit and 300-requests-per-five-minutes source-IP rate rule.
+- CORS and consistent JSON gateway errors for the future standalone frontend.
+- X-Ray on API Gateway and Lambda.
+- Privacy-safe API access logs, application logs, and blocked-request WAF logs retained for 30 days.
+- CloudWatch dashboard `csub-pa-production` and six alarms wired to `csub-pa-prod-alerts`.
+- No raw question, chat history, or feedback database.
+- CloudFormation stack `csub-pa-production-backend` and rollback-safe deployment script `scripts/deploy_backend.sh`.
 
 ## Request Pipeline
 
@@ -30,19 +44,19 @@ The agent cannot submit, approve, edit, withdraw, reject, or look up transaction
 
 ## Acceptance Results
 
-Final post-deployment run:
+Final post-deployment run through API Gateway and WAF:
 
-- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.311-second p95.
-- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 8.193-second p95.
+- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.783-second p95.
+- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 9.215-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
-- Local policy suite: 53/53 passed.
+- Local policy/API suite: 58/58 passed.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 
-## Remaining Launch Work
+## Remaining External Decisions
 
-- Put the final standalone frontend behind an approved domain/CDN and connect it to the production alias.
-- Add WAF/rate limiting and an abuse-response policy for broad public launch.
+- Connect the final standalone frontend to `POST /v1/chat` and put it behind its approved domain/CDN.
+- Supply and confirm an alert recipient for the already-provisioned SNS topic.
 - Approve retention and analytics rules before storing user questions or feedback.
 - Physically separate restricted content or add authentication before enabling any internal workflow.
-- Add infrastructure-as-code and an automated, governed source-synchronization pipeline.
+- Assign content-governance ownership before automating the custom-connector synchronization process.
