@@ -1,16 +1,44 @@
-# React + Vite
+# CSUB Procurement Assistant Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The standalone React/Vite interface for the public CSUB Procurement Assistant.
 
-Currently, two official plugins are available:
+Production: `https://d3s79ehfkh7xjx.cloudfront.net`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Backend connection
 
-## React Compiler
+The default build connects directly to the production API Gateway backend:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Chat: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod/v1/chat`
+- Health: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod/v1/health`
 
-## Expanding the ESLint configuration
+Copy `.env.example` to `.env.local` to override the backend for another environment. `VITE_API_BASE_URL` is preferred; `VITE_API_URL` and `VITE_HEALTH_URL` can override individual routes.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://127.0.0.1:5173`.
+
+## Verify
+
+```bash
+npm run lint
+npm run build
+```
+
+## Deploy to AWS
+
+The production frontend is hosted from a private S3 bucket through CloudFront. From the repository root, run:
+
+```bash
+AWS_PROFILE=summercamp AWS_REGION=us-west-2 ./scripts/deploy_frontend.sh
+```
+
+The script verifies the AWS account, validates the CloudFormation template, runs frontend checks, builds with the production API URL, uploads cache-safe assets, invalidates CloudFront, and smoke-tests the public HTTPS page. Override `VITE_API_BASE_URL` only when intentionally targeting a different backend.
+
+The current API is public/no-auth guidance only. The interface sends the selected guidance role, the current question, and at most six recent conversation items. It displays only the answer and cited source cards returned by the backend.
+
+The MVP product direction now allows an authenticated read-only status surface for requester and vendor progress questions. That authenticated surface must use a campus-approved identity provider and backend authorization before showing requisition, supplier, invoice, purchase-order, or payment status. The current frontend does not implement that sign-in flow yet.
