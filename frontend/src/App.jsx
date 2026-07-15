@@ -26,6 +26,11 @@ const API_BASE_URL = (
 ).replace(/\/+$/, '')
 const CHAT_API_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}/v1/chat`
 const CHAT_TIMEOUT_MS = 32_000
+const DEFAULT_SOURCE_PANEL_PERCENT = 38
+const MIN_SOURCE_PANEL_WIDTH = 280
+const MIN_CHAT_PANEL_WIDTH = 320
+const SOURCE_PANEL_MAX_PERCENT = 64
+const RESIZER_WIDTH = 9
 
 const roles = [
   { id: 'requester', label: 'Faculty or staff', Icon: UserRound },
@@ -337,6 +342,12 @@ function App() {
   const [messages, setMessages] = useState([])
   const [isSending, setIsSending] = useState(false)
   const [selectedSource, setSelectedSource] = useState(null)
+  const [sourcePanelPercent, setSourcePanelPercent] = useState(
+    DEFAULT_SOURCE_PANEL_PERCENT,
+  )
+  const [isResizingSource, setIsResizingSource] = useState(false)
+  const assistantPanelRef = useRef(null)
+  const isResizingSourceRef = useRef(false)
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
   const sendInFlightRef = useRef(false)
@@ -409,6 +420,76 @@ function App() {
     sendMessage()
   }
 
+  function setSourceWidthFromPixels(requestedWidth) {
+    const panel = assistantPanelRef.current
+    if (!panel) return
+
+    const panelWidth = panel.getBoundingClientRect().width
+    const maximumWidth = Math.min(
+      panelWidth * (SOURCE_PANEL_MAX_PERCENT / 100),
+      panelWidth - MIN_CHAT_PANEL_WIDTH - RESIZER_WIDTH,
+    )
+    const sourceWidth = Math.min(
+      Math.max(maximumWidth, MIN_SOURCE_PANEL_WIDTH),
+      Math.max(requestedWidth, MIN_SOURCE_PANEL_WIDTH),
+    )
+
+    setSourcePanelPercent((sourceWidth / panelWidth) * 100)
+  }
+
+  function resizeSourcePanel(clientX) {
+    const panel = assistantPanelRef.current
+    if (!panel) return
+
+    const bounds = panel.getBoundingClientRect()
+    setSourceWidthFromPixels(bounds.right - clientX)
+  }
+
+  function handleResizeKeyDown(event) {
+    const panel = assistantPanelRef.current
+    if (!panel) return
+
+    const panelWidth = panel.getBoundingClientRect().width
+    const currentWidth = panelWidth * (sourcePanelPercent / 100)
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setSourceWidthFromPixels(currentWidth + 24)
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setSourceWidthFromPixels(currentWidth - 24)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      setSourceWidthFromPixels(MIN_SOURCE_PANEL_WIDTH)
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      setSourceWidthFromPixels(panelWidth)
+    }
+  }
+
+  function handleMouseResizeStart(event) {
+    event.preventDefault()
+    isResizingSourceRef.current = true
+    assistantPanelRef.current?.classList.add('is-resizing-source')
+    setIsResizingSource(true)
+    resizeSourcePanel(event.clientX)
+
+    function handleMouseMove(moveEvent) {
+      resizeSourcePanel(moveEvent.clientX)
+    }
+
+    function stopMouseResize() {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', stopMouseResize)
+      isResizingSourceRef.current = false
+      assistantPanelRef.current?.classList.remove('is-resizing-source')
+      setIsResizingSource(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', stopMouseResize)
+  }
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -425,7 +506,13 @@ function App() {
 
       <main className="workspace">
         <section
-          className={`assistant-panel ${selectedSource ? 'has-source-panel' : ''}`}
+          ref={assistantPanelRef}
+          className={`assistant-panel ${selectedSource ? 'has-source-panel' : ''} ${isResizingSource ? 'is-resizing-source' : ''}`}
+          style={
+            selectedSource
+              ? { '--source-panel-width': `${sourcePanelPercent}%` }
+              : undefined
+          }
           aria-label="Procurement assistant"
         >
           <div className="assistant-main">
@@ -547,10 +634,56 @@ function App() {
           </div>
 
           {selectedSource && (
-            <SourcePanel
-              source={selectedSource}
-              onClose={() => setSelectedSource(null)}
-            />
+            <>
+              <div
+                className="source-resizer"
+                role="separator"
+                tabIndex="0"
+                aria-label="Resize source panel"
+                aria-orientation="vertical"
+                aria-valuemin={Math.round(
+                  (MIN_SOURCE_PANEL_WIDTH /
+                    (assistantPanelRef.current?.getBoundingClientRect().width ||
+                      MIN_SOURCE_PANEL_WIDTH)) *
+                    100,
+                )}
+                aria-valuemax={SOURCE_PANEL_MAX_PERCENT}
+                aria-valuenow={Math.round(sourcePanelPercent)}
+                onMouseDown={handleMouseResizeStart}
+                onPointerDown={(event) => {
+                  isResizingSourceRef.current = true
+                  if (event.nativeEvent.isTrusted) {
+                    event.currentTarget.setPointerCapture(event.pointerId)
+                  }
+                  setIsResizingSource(true)
+                  resizeSourcePanel(event.clientX)
+                }}
+                onPointerMove={(event) => {
+                  if (isResizingSourceRef.current) {
+                    resizeSourcePanel(event.clientX)
+                  }
+                }}
+                onPointerUp={(event) => {
+                  if (
+                    event.nativeEvent.isTrusted &&
+                    event.currentTarget.hasPointerCapture(event.pointerId)
+                  ) {
+                    event.currentTarget.releasePointerCapture(event.pointerId)
+                  }
+                  isResizingSourceRef.current = false
+                  setIsResizingSource(false)
+                }}
+                onPointerCancel={() => {
+                  isResizingSourceRef.current = false
+                  setIsResizingSource(false)
+                }}
+                onKeyDown={handleResizeKeyDown}
+              />
+              <SourcePanel
+                source={selectedSource}
+                onClose={() => setSelectedSource(null)}
+              />
+            </>
           )}
         </section>
       </main>

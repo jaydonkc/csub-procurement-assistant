@@ -478,7 +478,49 @@ button {
   flex-direction: column;
   overflow: hidden;
   background: var(--white);
+}
+
+.source-resizer {
+  position: relative;
+  z-index: 2;
+  width: 9px;
+  height: 100%;
+  align-self: stretch;
+  background: #f5f7fa;
+  border-right: 1px solid var(--line);
   border-left: 1px solid var(--line);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.source-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.source-resizer:hover::after,
+.source-resizer:focus-visible::after,
+.is-resizing-source .source-resizer::after {
+  background: var(--csub-blue);
+}
+
+.source-resizer:focus-visible {
+  outline: 3px solid rgba(0, 53, 148, 0.3);
+  outline-offset: -3px;
+}
+
+.is-resizing-source,
+.is-resizing-source * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.is-resizing-source .source-pdf,
+.is-resizing-source .source-video {
+  pointer-events: none;
 }
 
 .source-panel-header {
@@ -784,7 +826,10 @@ a:focus-visible {
 
 .assistant-panel.has-source-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 38%, 380px);
+  grid-template-columns:
+    minmax(320px, 1fr)
+    9px
+    minmax(280px, var(--source-panel-width, 38%));
 }
 
 @media (max-width: 720px) {
@@ -885,6 +930,10 @@ a:focus-visible {
   .assistant-panel.has-source-panel .source-panel {
     width: 100%;
     border-left: 0;
+  }
+
+  .assistant-panel.has-source-panel .source-resizer {
+    display: none;
   }
 }
 
