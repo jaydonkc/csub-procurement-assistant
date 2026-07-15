@@ -1,6 +1,6 @@
 # Agent Production Readiness
 
-Status: backend and production agent behavior verified July 15, 2026. The remaining launch work is frontend integration, an approved domain, and governance choices that cannot be inferred from the technical implementation.
+Status: the public frontend, backend, and production agent behavior were verified end to end on July 15, 2026. A CSUB-approved custom domain and governance choices remain external decisions.
 
 ## Frozen Runtime
 
@@ -29,6 +29,15 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 - No raw question, chat history, or feedback database.
 - CloudFormation stack `csub-pa-production-backend` and rollback-safe deployment script `scripts/deploy_backend.sh`.
 
+## Production Frontend
+
+- Public URL: `https://d3s79ehfkh7xjx.cloudfront.net`
+- CloudFront distribution: `E1J3M2Y5JS6LMM`, status `Deployed`
+- Private S3 origin with public access fully blocked and CloudFront origin access control
+- HTTPS redirect, HTTP/2 and HTTP/3, compressed delivery, security headers, and cache-safe asset metadata
+- CloudFormation stack `csub-pa-production-frontend` and deployment script `scripts/deploy_frontend.sh`
+- Live page, asset caching, CORS preflight, backend health, and a cited guided-chat response verified after deployment
+
 ## Request Pipeline
 
 1. Validate and bound the request body, role, message, and recent history.
@@ -55,7 +64,7 @@ The raw retrieval evaluation still records exact-source misses for supplier sear
 
 ## Remaining External Decisions
 
-- Connect the final standalone frontend to `POST /v1/chat` and put it behind its approved domain/CDN.
+- Decide whether to replace the working CloudFront domain with a CSUB-approved custom domain and ACM certificate.
 - Supply and confirm an alert recipient for the already-provisioned SNS topic.
 - Approve retention and analytics rules before storing user questions or feedback.
 - Physically separate restricted content or add authentication before enabling any internal workflow.

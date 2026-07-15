@@ -4,7 +4,7 @@ A standalone, role-aware guided procurement assistant for California State Unive
 
 The product helps CSUB requesters, vendors, and internal procurement stakeholders navigate CSUBUY/P2P, supplier onboarding, invoice questions, purchasing approvals, contract checks, commodity code guidance, technology review, and related procurement workflows.
 
-This repository contains the product documentation, the deployed AWS Lambda agent source, and its policy/grounding test suite. The standalone React/Flask scaffold is still a development shell; the production agent runtime is the versioned Lambda handler in `backend/lambda_function.py`.
+This repository contains the product documentation, deployed React frontend, AWS Lambda agent source, infrastructure templates, and policy/grounding test suite. The production frontend calls the versioned Lambda handler in `backend/lambda_function.py` through API Gateway.
 
 ## Product Positioning
 
@@ -52,10 +52,12 @@ The current Knowledge Base intentionally includes internal/admin and sensitive-P
 
 The production backend is exposed through API Gateway at `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`. Its stable contracts are `POST /v1/chat` and `GET /v1/health`. Both legacy Lambda Function URLs are IAM-only so public traffic cannot bypass API Gateway throttling and WAF.
 
+The production frontend is available at `https://d3s79ehfkh7xjx.cloudfront.net`. It is served through CloudFront from a private S3 origin and connects directly to the production API.
+
 See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
 
 Areas still open outside the backend implementation:
-- Integration of the standalone frontend with `POST /v1/chat`, plus its approved custom domain/CDN.
+- An optional CSUB-approved custom domain and ACM certificate for the deployed CloudFront frontend.
 - Selection and confirmation of an alert recipient for the provisioned SNS topic.
 - Analytics and feedback storage with an approved question-retention policy.
 - Admin tools and automated synchronization for future source changes.
