@@ -19,10 +19,7 @@ const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
 ).replace(/\/+$/, '')
 const CHAT_API_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}/v1/chat`
-const HEALTH_API_URL =
-  import.meta.env.VITE_HEALTH_URL || `${API_BASE_URL}/v1/health`
 const CHAT_TIMEOUT_MS = 32_000
-const HEALTH_TIMEOUT_MS = 8_000
 
 const roles = [
   { id: 'requester', label: 'Faculty or staff', Icon: UserRound },
@@ -137,32 +134,9 @@ function App() {
   const [role, setRole] = useState('requester')
   const [messages, setMessages] = useState([])
   const [isSending, setIsSending] = useState(false)
-  const [serviceStatus, setServiceStatus] = useState('checking')
-  const [serviceVersion, setServiceVersion] = useState('')
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
   const sendInFlightRef = useRef(false)
-
-  useEffect(() => {
-    let isCurrent = true
-
-    fetchJson(HEALTH_API_URL, {}, HEALTH_TIMEOUT_MS)
-      .then((health) => {
-        if (!isCurrent) return
-        if (health.status !== 'ok') {
-          throw new Error('Unexpected health response.')
-        }
-        setServiceVersion(health.version || '')
-        setServiceStatus('online')
-      })
-      .catch(() => {
-        if (isCurrent) setServiceStatus('unavailable')
-      })
-
-    return () => {
-      isCurrent = false
-    }
-  }, [])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -196,7 +170,6 @@ function App() {
         throw new Error('The assistant returned an empty response.')
       }
 
-      setServiceStatus('online')
       setMessages((previous) => [
         ...previous,
         {
@@ -208,7 +181,6 @@ function App() {
         },
       ])
     } catch (error) {
-      setServiceStatus('unavailable')
       setMessages((previous) => [
         ...previous,
         {
@@ -244,25 +216,6 @@ function App() {
           />
           <span className="brand-divider" aria-hidden="true" />
           <span className="product-name">Procurement Assistant</span>
-        </div>
-        <div className="header-meta">
-          <span className="demo-badge">Standalone demo</span>
-          <span
-            className={`service-status is-${serviceStatus}`}
-            title={
-              serviceVersion
-                ? `Connected to production backend version ${serviceVersion}`
-                : 'Production backend connection status'
-            }
-            role="status"
-          >
-            <span className="status-dot" aria-hidden="true" />
-            {serviceStatus === 'online'
-              ? 'Assistant online'
-              : serviceStatus === 'unavailable'
-                ? 'Service unavailable'
-                : 'Connecting'}
-          </span>
         </div>
       </header>
 
