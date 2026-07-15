@@ -104,10 +104,11 @@ Data sources:
 Behavior:
 - Index approved source documents.
 - Index only sources approved for no-auth public exposure in the MVP.
-- Retrieve relevant chunks for each query.
+- Retrieve relevant chunks only when a substantive procurement fact, procedure, policy, form, contact, or source is needed.
 - Rank CSUB-specific material above CSU-wide material when both apply.
 - Return document title, section/page, URL, and date/version when available.
 - Detect missing or low-confidence retrieval.
+- Respond naturally to greetings, thanks, capability questions, and other non-factual conversation without fabricating citations or showing source cards.
 
 Output:
 - Answer grounded in retrieved text.
@@ -119,6 +120,7 @@ Acceptance criteria:
 - CSUB-specific documents are preferred over CSU-wide documents for campus-specific procedures.
 - If sources conflict, the assistant surfaces the conflict and recommends contacting the responsible office.
 - Restricted, internal-only, user-specific, supplier-specific, invoice-specific, or payment-specific data is excluded from no-auth retrieval.
+- A greeting such as `hi` returns a brief procurement-oriented response with no retrieval and an empty source list.
 
 ### F3. Guided Procurement Pathfinder
 

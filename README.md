@@ -4,7 +4,7 @@ A standalone, role-aware guided procurement assistant for California State Unive
 
 The product helps CSUB requesters, vendors, and internal procurement stakeholders navigate CSUBUY/P2P, supplier onboarding, invoice questions, purchasing approvals, contract checks, commodity code guidance, technology review, and related procurement workflows.
 
-This repository contains the product documentation, the deployed AWS Lambda agent source, and its policy/grounding test suite. The standalone React/Flask scaffold is still a development shell; the production agent runtime is the versioned Lambda handler in `backend/lambda_function.py`.
+This repository contains the product documentation, deployed React frontend, AWS Lambda agent source, infrastructure templates, and policy/grounding test suite. The production frontend calls the versioned Lambda handler in `backend/lambda_function.py` through API Gateway.
 
 ## Product Positioning
 
@@ -44,18 +44,22 @@ Live status as of July 15, 2026: the source-aware Knowledge Base is active and c
 
 The chunked retrieval configuration passed a 12-scenario guided procurement comparison against the previous default chunker: 12/12 expected-source hits, better procedural coverage and source ranking, fewer duplicate context chunks after a two-chunks-per-source cap, useful timestamps for all five video-oriented questions, and no internal-source results under the public filter. The AWS test chatbot now uses this configuration.
 
-The production agent behavior is frozen as Lambda version `4` behind the `production` alias. It uses Claude Sonnet 4.6 for grounded generation and Claude Haiku 4.5 for citation auditing. Deterministic pre-model gates block transaction actions, live lookups, internal/admin procedures, PII-access guidance, prompt injection, and explicit out-of-scope topics. Source-verified guided templates cover frequent workflows, while other answers must pass citation syntax, public-source, numeric-boundary, source-scope, and entailment checks or fail closed.
+The production agent behavior is frozen as Lambda version `10` behind the `production` alias. It uses Claude Sonnet 4.6 for grounded generation and Claude Haiku 4.5 for pre-retrieval routing and citation auditing. Deterministic pre-model gates block transaction actions, live lookups, internal/admin procedures, PII-access guidance, and prompt injection. A structured router then decides whether the turn is conversational, needs clarification, is out of scope, or needs Knowledge Base retrieval. Greetings such as `hi` therefore receive a natural answer with no source cards, while substantive procurement questions still retrieve and cite. Invalid, unavailable, or uncertain router output fails safely toward retrieval.
 
-The final protected-API acceptance run passed 13/13 guided end-to-end scenarios with the expected source and valid citations, 8/8 adversarial/capability boundaries, 3/3 video timestamp checks, zero internal-source leaks, zero duplicate source cards, and 9.215-second p95 end-to-end latency. The broader raw-retrieval suite retained 34/36 exact-source hits and 93.1% mean term coverage; guided routing is evaluated separately because the product is not a generic similarity-search chatbot.
+Source-verified guided templates cover frequent workflows, while other answers must pass citation syntax, public-source, numeric-boundary, source-scope, and entailment checks or fail closed. Cited public documents and training videos receive private, 15-minute source links; the source bucket remains non-public.
+
+The full protected-API baseline passed 13/13 guided end-to-end scenarios with the expected source and valid citations, 8/8 adversarial/capability boundaries, 3/3 video timestamp checks, zero internal-source leaks, zero duplicate source cards, and 9.215-second p95 end-to-end latency. After conditional retrieval was added, a targeted live run passed nine routing cases covering greetings, capabilities, vague help, unrelated requests, mixed greeting/procedure prompts, blocked transaction actions, grounded document guidance, timestamped video guidance, and contextual follow-ups. The deployed UI also returned the `hi` response without rendering sources. The broader raw-retrieval suite retained 34/36 exact-source hits and 93.1% mean term coverage; guided routing is evaluated separately because the product is not a generic similarity-search chatbot.
 
 The current Knowledge Base intentionally includes internal/admin and sensitive-PII-access guidance from the supplied collection. Those sources carry `access_scope=internal` metadata, but the connector does not enforce ACLs. A public/no-auth application must enforce source filtering or use a separate restricted corpus before launch.
 
 The production backend is exposed through API Gateway at `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`. Its stable contracts are `POST /v1/chat` and `GET /v1/health`. Both legacy Lambda Function URLs are IAM-only so public traffic cannot bypass API Gateway throttling and WAF.
 
+The production frontend is available at `https://d3s79ehfkh7xjx.cloudfront.net`. It is served through CloudFront from a private S3 origin and connects directly to the production API.
+
 See [AWS architecture](docs/aws-architecture.md) for the live resource inventory, ingestion boundary, and deferred decisions.
 
 Areas still open outside the backend implementation:
-- Integration of the standalone frontend with `POST /v1/chat`, plus its approved custom domain/CDN.
+- An optional CSUB-approved custom domain and ACM certificate for the deployed CloudFront frontend.
 - Selection and confirmation of an alert recipient for the provisioned SNS topic.
 - Analytics and feedback storage with an approved question-retention policy.
 - Admin tools and automated synchronization for future source changes.

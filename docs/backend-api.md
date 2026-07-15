@@ -32,14 +32,18 @@ The API requires `message` and `role`. The message is limited to 4,000 character
       "id": "S1",
       "path": "Invoicing and Vouchers/Voucher Pay Status.pdf",
       "kind": "document",
-      "timestamp": null
+      "timestamp": null,
+      "source_url": "https://short-lived-private-source-url",
+      "media_expires_in": 900
     }
   ],
   "request_id": "example-request-id"
 }
 ```
 
-Safety or capability routes can return a successful guidance response with an empty `sources` array. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
+Conversation, clarification, out-of-scope, safety, and capability routes can return a successful response with an empty `sources` array. The pre-retrieval router is used only after deterministic gates; it defaults to retrieval when its output is invalid, unavailable, or uncertain. Substantive procurement answers still require grounded citations.
+
+Public cited documents can include `source_url`; cited training videos can include both `source_url` and `media_url` plus a transcript `timestamp`. These are private S3 presigned links with `media_expires_in=900`, not permanent public URLs. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
 
 ## Production Controls
 
@@ -52,6 +56,6 @@ Safety or capability routes can return a successful guidance response with an em
 
 ## Deployment
 
-`infra/backend.yaml` defines the production API, WAF, logging, metrics, alarms, alert topic, dashboard, API invocation permission, and X-Ray permission. `scripts/deploy_backend.sh` vendors the pinned Lambda SDK, runs the policy/API tests, updates the stack, verifies a grounded `$LATEST` response, publishes an immutable version, moves the alias, and rolls back if post-alias health or grounded API checks fail.
+`infra/backend.yaml` defines the production API, WAF, logging, metrics, alarms, alert topic, dashboard, API invocation permission, and X-Ray permission. `scripts/deploy_backend.sh` verifies account `335010339891`, reconciles the bounded source-link policies, vendors the pinned Lambda SDK, runs the policy/API tests, updates the stack, verifies both grounded and no-retrieval `$LATEST` responses, publishes an immutable version, moves the alias, and rolls back if post-alias health, grounded-answer, or conditional-retrieval checks fail. Code hashes and revision IDs prevent a concurrent deployment from silently replacing the tested code.
 
 The deployment script defaults to AWS profile `summercamp` and region `us-west-2`. Optional environment variables include `ALLOWED_ORIGIN`, `WAF_RATE_LIMIT`, and `ALERT_EMAIL`. Supplying `ALERT_EMAIL` creates an email subscription that still requires recipient confirmation.

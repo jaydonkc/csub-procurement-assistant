@@ -42,8 +42,9 @@
 - Resolved for the public boundary: deterministic gates block system actions, live lookups, internal/admin procedures, PII access, prompt injection, and explicit out-of-scope topics; self-reported role is not authorization.
 - Resolved for backend ingress: API Gateway `w0vfga8dil` exposes versioned chat and health routes; WAF, request validation, throttling, CORS, 30-day privacy-safe logs, X-Ray, alarms, and a CloudWatch dashboard are active. Direct Lambda URLs are IAM-only.
 - Resolved for repeatability: CloudFormation stack `csub-pa-production-backend` and `scripts/deploy_backend.sh` manage the backend and require grounded pre-alias and post-alias smoke tests.
+- Resolved for frontend hosting: `https://d3s79ehfkh7xjx.cloudfront.net` serves the production build through CloudFront distribution `E1J3M2Y5JS6LMM` from a private S3 origin. Stack `csub-pa-production-frontend` and `scripts/deploy_frontend.sh` manage repeatable deployment.
 - Resolved for guided evaluation: 13/13 end-to-end scenarios, 8/8 boundary cases, and 3/3 video timestamp checks passed through the protected API with no internal-source leakage and 9.215-second p95 end-to-end latency.
-- Still open for campus launch: frontend integration and its custom domain/CDN, an approved alert recipient, analytics/feedback retention policy, and source-governance ownership.
+- Still open for campus launch: an optional CSUB custom domain, an approved alert recipient, analytics/feedback retention policy, and source-governance ownership.
 - Should internal/admin sources move to a separate restricted Knowledge Base before production launch?
 - Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
