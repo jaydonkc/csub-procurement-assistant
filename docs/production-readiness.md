@@ -57,7 +57,7 @@ The agent cannot submit, approve, edit, withdraw, reject, or look up transaction
 The development implementation reorganizes the backend without changing the product boundary:
 
 - Pydantic models validate chat requests, recent history, response source cards, and the grounding verdict.
-- Pydantic AI uses Bedrock Converse for Sonnet answer generation and a structured Haiku grounding audit.
+- Pydantic AI uses Bedrock Converse for typed Haiku retrieval routing, Sonnet answer generation, and a structured Haiku grounding audit.
 - An output validator checks citation syntax and source IDs, runs the grounding audit, and permits one constrained model retry before failing closed.
 - Request classification, guided clarification, Knowledge Base retrieval, public-source filtering, source caps, source-verified workflow templates, and S3 URL signing remain deterministic application code.
 - Retrieval is performed before model execution and is not exposed as a model-optional tool.

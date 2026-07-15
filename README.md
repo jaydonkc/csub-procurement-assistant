@@ -8,9 +8,9 @@ This repository contains the product documentation, deployed React frontend, AWS
 
 ## Backend Architecture
 
-The development backend uses Pydantic AI `2.10.0` as a thin orchestration layer over Amazon Bedrock Converse. Pydantic models validate the public chat contract, a Sonnet agent generates source-cited answers, and a Haiku agent returns a structured grounding verdict. The answer agent gets one validation-driven retry before the request fails closed.
+The development backend uses Pydantic AI `2.10.0` as a thin orchestration layer over Amazon Bedrock Converse. Pydantic models validate the public chat contract, a Sonnet agent generates source-cited answers, and Haiku agents return typed retrieval-routing and grounding decisions. The answer agent gets one validation-driven retry before the request fails closed.
 
-Pydantic AI does not control whether retrieval or policy enforcement happens. The Lambda applies capability and access gates first, performs filtered Bedrock Knowledge Base retrieval deterministically, uses source-verified workflow templates where available, and only then invokes the model layer.
+The Lambda applies deterministic capability and access gates first. Pydantic AI then runs the typed pre-retrieval router; only the `retrieve` route calls the filtered Bedrock Knowledge Base. Retrieval, public-source filtering, source caps, source-verified workflow templates, and source signing remain deterministic application code.
 
 Backend modules:
 
@@ -18,9 +18,10 @@ Backend modules:
 - `backend/models.py` - typed request, response, source-card, and grounding contracts.
 - `backend/policy.py` - deterministic public-access and capability gates.
 - `backend/retrieval.py` - Bedrock Knowledge Base query construction, filtering, and source caps.
+- `backend/router.py` - deterministic fallback and reply-safety checks around typed routing.
 - `backend/workflows.py` - source-verified responses for frequent procurement workflows.
 - `backend/grounding.py` - citation normalization and deterministic grounding checks.
-- `backend/pydantic_agent.py` - Pydantic AI Bedrock generation, structured auditing, and one-retry/fail-closed behavior.
+- `backend/pydantic_agent.py` - Pydantic AI routing, generation, structured auditing, and one-retry/fail-closed behavior.
 - `backend/source_access.py` - internal-source exclusion and short-lived S3 source links.
 
 The Pydantic AI refactor is development code and has not replaced the frozen Lambda `production` alias. It must pass the live retrieval and guided end-to-end acceptance suites before a new immutable Lambda version is published.
