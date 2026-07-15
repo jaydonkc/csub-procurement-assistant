@@ -1,7 +1,7 @@
 import base64
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend import lambda_function as app
 
@@ -30,6 +30,14 @@ class RequestClassificationTests(unittest.TestCase):
         route = app.classify_request("How do I create or change a requisition?", "requester")
         self.assertIsNone(route)
 
+    def test_greeting_before_requisition_howto_is_not_treated_as_an_action(self):
+        route = app.classify_request("Hi, how do I create a requisition?", "requester")
+        self.assertIsNone(route)
+
+    def test_greeting_before_direct_action_remains_blocked(self):
+        route = app.classify_request("Hi, create a requisition for me.", "requester")
+        self.assertEqual(route["route"], "transaction_action")
+
     def test_internal_approval_instructions_are_blocked(self):
         route = app.classify_request("How do I approve a requisition?", "internal_staff")
         self.assertEqual(route["route"], "internal_procedure")
@@ -46,6 +54,10 @@ class RequestClassificationTests(unittest.TestCase):
 
     def test_requester_status_howto_can_use_public_sources(self):
         route = app.classify_request("How do I check invoice status?", "requester")
+        self.assertIsNone(route)
+
+    def test_greeting_before_requester_status_howto_can_use_public_sources(self):
+        route = app.classify_request("Hello, where do I check invoice status?", "requester")
         self.assertIsNone(route)
 
     def test_ambiguous_software_request_gets_guided_intake(self):
@@ -129,6 +141,113 @@ class SourceBoundaryTests(unittest.TestCase):
     def test_public_source_is_accepted(self):
         self.assertTrue(app.is_public_source({"access_scope": "public"}, "Suppliers/Supplier Search Tips.pdf"))
 
+    def test_public_video_maps_to_private_media_object(self):
+        source = {
+            "kind": "video_transcript",
+            "path": "Receiving/Creating a Receipt.mp4",
+        }
+        self.assertEqual(
+            app.public_video_object_key(source),
+            "media/videos/Receiving/Creating a Receipt.mp4",
+        )
+
+    def test_internal_video_never_maps_to_media_object(self):
+        source = {
+            "kind": "video_transcript",
+            "path": "Approvals/Taking Action on Requisitions.mp4",
+        }
+        self.assertIsNone(app.public_video_object_key(source))
+
+    def test_document_never_maps_to_media_object(self):
+        source = {"kind": "document", "path": "Receiving/Creating a Receipt.pdf"}
+        self.assertIsNone(app.public_video_object_key(source))
+
+    def test_public_document_maps_to_private_source_object(self):
+        source = {
+            "kind": "document",
+            "path": "Getting Started/Setting Default Addresses.pdf",
+        }
+        self.assertEqual(
+            app.public_document_object_key(source),
+            (
+                "approved/documents/Getting Started/Setting Default Addresses.pdf",
+                "application/pdf",
+            ),
+        )
+
+    def test_internal_document_never_maps_to_source_object(self):
+        source = {
+            "kind": "document",
+            "path": "Approvals/Taking Action on Requisitions.pdf",
+        }
+        self.assertIsNone(app.public_document_object_key(source))
+
+    def test_video_without_kind_still_maps_by_canonical_path(self):
+        source = {"path": "Receiving/Creating a Receipt.mp4"}
+        self.assertEqual(
+            app.public_video_object_key(source),
+            "media/videos/Receiving/Creating a Receipt.mp4",
+        )
+
+    def test_public_video_source_gets_short_lived_source_url(self):
+        source = {
+            "id": "S1",
+            "kind": "video_transcript",
+            "path": "Receiving/Creating a Receipt.mp4",
+            "timestamp": "00:00:06.440 --> 00:01:11.440",
+        }
+        fake_s3 = Mock()
+        fake_s3.generate_presigned_url.return_value = "https://media.example/receipt"
+        with patch.object(app, "_s3", return_value=fake_s3):
+            enriched = app.sources_with_urls([source])
+
+        self.assertNotIn("media_url", source)
+        self.assertEqual(enriched[0]["source_url"], "https://media.example/receipt")
+        self.assertEqual(enriched[0]["media_url"], "https://media.example/receipt")
+        self.assertEqual(enriched[0]["media_expires_in"], app.MEDIA_URL_TTL_SECONDS)
+        fake_s3.generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={
+                "Bucket": app.SOURCE_BUCKET,
+                "Key": "media/videos/Receiving/Creating a Receipt.mp4",
+                "ResponseContentType": "video/mp4",
+            },
+            ExpiresIn=app.MEDIA_URL_TTL_SECONDS,
+        )
+
+    def test_public_document_source_gets_short_lived_source_url(self):
+        source = {
+            "id": "S1",
+            "kind": "document",
+            "path": "Getting Started/Setting Default Addresses.pdf",
+        }
+        fake_s3 = Mock()
+        fake_s3.generate_presigned_url.return_value = "https://sources.example/default-addresses"
+        with patch.object(app, "_s3", return_value=fake_s3):
+            enriched = app.sources_with_urls([source])
+
+        self.assertEqual(enriched[0]["source_url"], "https://sources.example/default-addresses")
+        self.assertNotIn("media_url", enriched[0])
+        fake_s3.generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={
+                "Bucket": app.SOURCE_BUCKET,
+                "Key": "approved/documents/Getting Started/Setting Default Addresses.pdf",
+                "ResponseContentType": "application/pdf",
+            },
+            ExpiresIn=app.MEDIA_URL_TTL_SECONDS,
+        )
+
+    def test_internal_video_does_not_attempt_media_signing(self):
+        source = {
+            "id": "S1",
+            "kind": "video_transcript",
+            "path": "Admin (Campus, Security, & Optimize)/Level 1 Support Training.mp4",
+        }
+        with patch.object(app, "_s3", side_effect=AssertionError("must not sign")):
+            enriched = app.sources_with_urls([source])
+        self.assertNotIn("media_url", enriched[0])
+
     def test_query_expansion_targets_supplier_search(self):
         query = app.build_retrieval_query("How do I find whether a supplier is registered?")
         self.assertIn("Supplier Search Tips", query)
@@ -144,6 +263,7 @@ class SourceBoundaryTests(unittest.TestCase):
     def test_voucher_generation_hint_limits_status_inference(self):
         hint = app.generation_hint("Where do I review voucher status?")
         self.assertIn("Do not infer who has access", hint)
+
 
     def test_voucher_template_requires_expected_source_terms(self):
         sources = [{"id": "S1", "path": "Invoicing and Vouchers/Voucher Pay Status.pdf"}]
@@ -236,6 +356,109 @@ class SourceBoundaryTests(unittest.TestCase):
         result = app.guided_template_answer("How do I update my profile?", context, sources)
         self.assertIn("00:00:06.000 --> 00:01:14.000", result[0])
         self.assertEqual(result[1][0]["timestamp"], "00:00:06.000 --> 00:01:14.000")
+
+
+class ConditionalRetrievalTests(unittest.TestCase):
+    @staticmethod
+    def router_runtime(payload):
+        runtime = Mock()
+        runtime.converse.return_value = {
+            "output": {"message": {"content": [{"text": json.dumps(payload)}]}}
+        }
+        return runtime
+
+    def test_greeting_is_routed_to_conversation_without_sources(self):
+        runtime = self.router_runtime(
+            {
+                "route": "conversation",
+                "reply": "Hi! What procurement task can I help you with today?",
+                "search_query": "",
+                "reason": "greeting",
+            }
+        )
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("hi", "requester", [])
+        self.assertEqual(decision["route"], "conversation")
+        self.assertEqual(decision["search_query"], "")
+        self.assertIn("Hi!", decision["reply"])
+
+    def test_mixed_greeting_and_procurement_question_retrieves(self):
+        runtime = self.router_runtime(
+            {
+                "route": "retrieve",
+                "reply": "",
+                "search_query": "create a CSUBUY requisition",
+                "reason": "procedural_question",
+            }
+        )
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval(
+                "Hi, how do I create a requisition?",
+                "requester",
+                [],
+            )
+        self.assertEqual(decision["route"], "retrieve")
+        self.assertEqual(decision["search_query"], "create a CSUBUY requisition")
+
+    def test_invalid_router_output_fails_safely_to_retrieval(self):
+        runtime = Mock()
+        runtime.converse.return_value = {
+            "output": {"message": {"content": [{"text": "not json"}]}}
+        }
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("Where is the invoice guide?", "requester", [])
+        self.assertEqual(decision["route"], "retrieve")
+        self.assertEqual(decision["search_query"], "Where is the invoice guide?")
+
+    def test_router_exception_fails_safely_to_retrieval(self):
+        runtime = Mock()
+        runtime.converse.side_effect = RuntimeError("router unavailable")
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("How do I create a receipt?", "requester", [])
+        self.assertEqual(decision["route"], "retrieve")
+
+    def test_unsafe_non_retrieval_reply_is_replaced(self):
+        runtime = self.router_runtime(
+            {
+                "route": "conversation",
+                "reply": "Click the form and submit it within 30 days [S1].",
+                "search_query": "",
+                "reason": "bad_reply",
+            }
+        )
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("hello", "requester", [])
+        self.assertEqual(decision["route"], "conversation")
+        self.assertNotIn("[S1]", decision["reply"])
+        self.assertIn("What are you trying to accomplish?", decision["reply"])
+
+    def test_capability_reply_cannot_imply_live_tracking(self):
+        runtime = self.router_runtime(
+            {
+                "route": "conversation",
+                "reply": "I can track your requisitions and payments.",
+                "search_query": "",
+                "reason": "capabilities",
+            }
+        )
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("What can you do?", "requester", [])
+        self.assertNotIn("track your", decision["reply"])
+        self.assertIn("What are you trying to accomplish?", decision["reply"])
+
+    def test_out_of_scope_route_returns_no_search_query(self):
+        runtime = self.router_runtime(
+            {
+                "route": "out_of_scope",
+                "reply": "I’m focused on CSUB purchasing and procurement guidance.",
+                "search_query": "",
+                "reason": "unrelated_request",
+            }
+        )
+        with patch.object(app, "_clients", return_value=(None, runtime)):
+            decision = app.decide_retrieval("Tell me a joke", "requester", [])
+        self.assertEqual(decision["route"], "out_of_scope")
+        self.assertEqual(decision["search_query"], "")
 
 
 class GroundingTests(unittest.TestCase):
@@ -365,7 +588,10 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(app.request_path({"rawPath": "/v1/chat/"}), "/v1/chat")
 
     def test_fixed_gate_does_not_call_retrieval(self):
-        with patch.object(app, "retrieve_sources", side_effect=AssertionError("must not retrieve")):
+        with (
+            patch.object(app, "decide_retrieval", side_effect=AssertionError("must not route")),
+            patch.object(app, "retrieve_sources", side_effect=AssertionError("must not retrieve")),
+        ):
             result = app.handler(
                 post_event({"message": "Approve requisition 445566 for me.", "role": "internal_staff"}),
                 None,
@@ -375,8 +601,67 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(payload["sources"], [])
         self.assertIn("cannot submit", payload["answer"])
 
+    def test_conversation_route_does_not_call_retrieval(self):
+        with (
+            patch.object(
+                app,
+                "decide_retrieval",
+                return_value={
+                    "route": "conversation",
+                    "reply": "Hi! What procurement task can I help you with?",
+                    "search_query": "",
+                    "reason": "greeting",
+                },
+            ),
+            patch.object(app, "retrieve_sources", side_effect=AssertionError("must not retrieve")),
+        ):
+            result = app.handler(post_event({"message": "hi", "role": "requester"}), None)
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(payload["sources"], [])
+        self.assertIn("Hi!", payload["answer"])
+
+    def test_retrieval_route_uses_rewritten_query(self):
+        with (
+            patch.object(
+                app,
+                "decide_retrieval",
+                return_value={
+                    "route": "retrieve",
+                    "reply": "",
+                    "search_query": "standalone voucher status guidance",
+                    "reason": "follow_up",
+                },
+            ),
+            patch.object(app, "retrieve_sources", return_value=("", [])) as retrieve,
+        ):
+            result = app.handler(
+                post_event(
+                    {
+                        "message": "Where do I check that?",
+                        "role": "requester",
+                        "history": [{"role": "user", "text": "I need voucher status guidance."}],
+                    }
+                ),
+                None,
+            )
+        self.assertEqual(result["statusCode"], 200)
+        retrieve.assert_called_once_with("standalone voucher status guidance")
+
     def test_no_source_result_fails_closed(self):
-        with patch.object(app, "retrieve_sources", return_value=("", [])):
+        with (
+            patch.object(
+                app,
+                "decide_retrieval",
+                return_value={
+                    "route": "retrieve",
+                    "reply": "",
+                    "search_query": "undocumented exception",
+                    "reason": "factual_question",
+                },
+            ),
+            patch.object(app, "retrieve_sources", return_value=("", [])),
+        ):
             result = app.handler(
                 post_event({"message": "What is the undocumented exception?", "role": "requester"}),
                 None,

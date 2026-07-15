@@ -6,11 +6,11 @@ Status: the public frontend, backend, and production agent behavior were verifie
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `4`
+- Version: `10`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Rollback versions: `2`, then `1`
+- Immediate predecessor: `9` (source links without conditional retrieval); version `8` retains conditional retrieval and video playback
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -41,13 +41,14 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 ## Request Pipeline
 
 1. Validate and bound the request body, role, message, and recent history.
-2. Apply deterministic capability, access, prompt-injection, PII, and out-of-scope gates.
-3. Ask a guided clarification when required purchase context is missing.
-4. Retrieve only public candidates and exclude internal metadata and known internal/admin paths.
-5. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
-6. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
-7. Attempt one constrained correction; fail closed if the answer remains unsupported.
-8. Return only cited public source cards and privacy-preserving request metadata.
+2. Apply deterministic capability, access, prompt-injection, and PII gates.
+3. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
+4. Return bounded natural language with no sources for non-retrieval turns.
+5. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
+6. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
+7. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
+8. Attempt one constrained correction; fail closed if the answer remains unsupported.
+9. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
 
 The agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording only and never authorize restricted content.
 
@@ -58,7 +59,8 @@ Final post-deployment run through API Gateway and WAF:
 - Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.783-second p95.
 - Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 9.215-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
-- Local policy/API suite: 58/58 passed.
+- Conditional retrieval/source-link live check: 9/9 routing scenarios passed; `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
+- Local policy/API suite: 78/78 passed.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 

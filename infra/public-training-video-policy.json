@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadPublicTrainingVideos",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Fiscal Year End/2026 Fiscal Year End Process Training.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Getting Started/User Profile Update.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Getting Started/Using Comments.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Procurement/Updating PO Payment Terms.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Receiving/Creating a Receipt.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Search, Data Exports, Reports, & Support Tickets/Search for Requisitions (CSU08_SearchRequisition).mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Search, Data Exports, Reports, & Support Tickets/Searching in CSUBUY (CSU02_BasicAdvancedSearching).mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Shopping and Requistions/Shop Using a Form.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Shopping and Requistions/Shop Using a Punchout Catalog.mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Shopping and Requistions/Submitting a Change Request (CSU10_POChangeRequest_V2).mp4",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Suppliers/Request a New Supplier.mp4"
+      ]
+    }
+  ]
+}
