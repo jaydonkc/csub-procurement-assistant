@@ -1,9 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 function App() {
   const [input, setInput] = useState("")
   const[messages, setMessages] = useState([])
+  const chatBoxRef = useRef(null)
+    useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight
+    }
+  }, [messages])
   async function sendMessage() {
     if (!input.trim()) return
 
@@ -41,7 +47,7 @@ function App() {
     <div className="app">
       <h1>CSUB Procurement Assistant</h1>
 
-      <div className="chat-box">
+      <div className="chat-box" ref={chatBoxRef}>
         {messages.map((msg, index) => (
           <div key={index} className={msg.sender}>
             <strong>{msg.sender === "user" ? "You" : "Assistant"}:</strong> {msg.text}
