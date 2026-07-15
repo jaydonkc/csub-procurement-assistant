@@ -22,9 +22,24 @@ const CHAT_API_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}/v1/chat`
 const CHAT_TIMEOUT_MS = 32_000
 
 const roles = [
-  { id: 'requester', label: 'Faculty or staff', Icon: UserRound },
-  { id: 'vendor', label: 'Vendor or supplier', Icon: Store },
-  { id: 'internal_staff', label: 'Support staff', Icon: Headphones },
+  {
+    id: 'requester',
+    label: 'Faculty or staff',
+    detail: 'Purchases, receipts, and approvals',
+    Icon: UserRound,
+  },
+  {
+    id: 'vendor',
+    label: 'Vendor or supplier',
+    detail: 'Registration and supplier updates',
+    Icon: Store,
+  },
+  {
+    id: 'internal_staff',
+    label: 'Support staff',
+    detail: 'Policy lookup and service guidance',
+    Icon: Headphones,
+  },
 ]
 
 const starters = [
@@ -44,6 +59,13 @@ const starters = [
     text: 'How do I update my CSUBUY profile?',
     Icon: UserRoundCog,
   },
+]
+
+const scopeItems = [
+  'Purchasing policy',
+  'CSUBUY tasks',
+  'Supplier setup',
+  'Receipts and profile help',
 ]
 
 function sourceName(path = 'CSUB procurement source') {
@@ -137,6 +159,7 @@ function App() {
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
   const sendInFlightRef = useRef(false)
+  const activeRole = roles.find(({ id }) => id === role) || roles[0]
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -224,7 +247,7 @@ function App() {
           <div className="role-bar">
             <span className="role-label">I am a</span>
             <div className="role-options" aria-label="Choose your role">
-              {roles.map(({ id, label, Icon }) => (
+              {roles.map(({ id, label, detail, Icon }) => (
                 <button
                   className={`role-option ${role === id ? 'is-active' : ''}`}
                   type="button"
@@ -233,68 +256,102 @@ function App() {
                   aria-pressed={role === id}
                 >
                   <Icon size={16} aria-hidden="true" />
-                  <span>{label}</span>
+                  <span className="role-copy">
+                    <span>{label}</span>
+                    <small>{detail}</small>
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
-            {messages.length === 0 ? (
-              <div className="welcome">
-                <div className="welcome-mark" aria-hidden="true">
-                  <Building2 size={28} />
+          <div className="panel-body">
+            <aside className="context-panel" aria-label="Assistant context">
+              <div>
+                <p className="context-label">Answering for</p>
+                <div className="context-role">
+                  <activeRole.Icon size={18} aria-hidden="true" />
+                  <span>{activeRole.label}</span>
                 </div>
-                <p className="eyebrow">Purchasing guidance</p>
-                <h1>What do you need help purchasing?</h1>
+                <p className="context-description">{activeRole.detail}</p>
+              </div>
 
-                <div className="starter-grid" aria-label="Suggested questions">
-                  {starters.map(({ text, Icon }) => (
-                    <button
-                      className="starter"
-                      type="button"
-                      key={text}
-                      onClick={() => sendMessage(text)}
-                    >
-                      <Icon size={19} aria-hidden="true" />
-                      <span>{text}</span>
-                    </button>
+              <div className="scope-block">
+                <p className="context-label">Guidance scope</p>
+                <div className="scope-list">
+                  {scopeItems.map((item) => (
+                    <span key={item}>{item}</span>
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="message-list" aria-live="polite">
-                {messages.map((message) =>
-                  message.sender === 'assistant' ? (
-                    <AssistantMessage key={message.id} message={message} />
-                  ) : (
-                    <article className="message user-message" key={message.id}>
+            </aside>
+
+            <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
+              {messages.length === 0 ? (
+                <div className="welcome">
+                  <div className="welcome-mark" aria-hidden="true">
+                    <Building2 size={28} />
+                  </div>
+                  <p className="eyebrow">Purchasing guidance</p>
+                  <h1>What do you need help purchasing?</h1>
+                  <p className="welcome-copy">
+                    Ask about policy, CSUBUY steps, supplier setup, or purchase
+                    documentation. Answers are shaped for your selected role.
+                  </p>
+
+                  <div className="starter-grid" aria-label="Suggested questions">
+                    {starters.map(({ text, Icon }) => (
+                      <button
+                        className="starter"
+                        type="button"
+                        key={text}
+                        onClick={() => sendMessage(text)}
+                      >
+                        <Icon size={19} aria-hidden="true" />
+                        <span>{text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="message-list" aria-live="polite">
+                  <div className="thread-status">
+                    <span>{activeRole.label}</span>
+                    <span>{messages.length} messages</span>
+                  </div>
+
+                  {messages.map((message) =>
+                    message.sender === 'assistant' ? (
+                      <AssistantMessage key={message.id} message={message} />
+                    ) : (
+                      <article className="message user-message" key={message.id}>
+                        <div className="message-content">
+                          <div className="message-label">You</div>
+                          <p>{message.text}</p>
+                        </div>
+                      </article>
+                    ),
+                  )}
+
+                  {isSending && (
+                    <article className="message assistant-message loading-message">
+                      <div className="assistant-mark" aria-hidden="true">
+                        <Building2 size={17} />
+                      </div>
                       <div className="message-content">
-                        <div className="message-label">You</div>
-                        <p>{message.text}</p>
+                        <div className="message-label">CSUB Procurement Assistant</div>
+                        <div className="thinking" aria-label="Preparing an answer">
+                          <span />
+                          <span />
+                          <span />
+                        </div>
                       </div>
                     </article>
-                  ),
-                )}
-
-                {isSending && (
-                  <article className="message assistant-message loading-message">
-                    <div className="assistant-mark" aria-hidden="true">
-                      <Building2 size={17} />
-                    </div>
-                    <div className="message-content">
-                      <div className="message-label">CSUB Procurement Assistant</div>
-                      <div className="thinking" aria-label="Preparing an answer">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                    </div>
-                  </article>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+            </div>
           </div>
 
           <form className="composer-area" onSubmit={handleSubmit}>
