@@ -36,11 +36,12 @@
 - Resolved: the prototype uses AWS account `335010339891` in `us-west-2`, accessed through CLI profile `summercamp`.
 - Resolved for content and retrieval: private Amazon S3 source storage plus an Amazon Bedrock managed Knowledge Base.
 - Resolved for the current account policy: S3 Vectors and the native Bedrock S3 crawler path are unavailable, so approved objects are submitted through a managed custom connector using an authenticated `summercamp` operator session.
-- Resolved for the current corpus: all 80 real files from `CSUBuyP2P` are in canonical S3 storage; 63 documents are text-indexed and 17 videos are represented by indexed timestamped transcripts.
-- Resolved for replacement status: the 16 `NOT_FOUND` identifiers are deletion tombstones from the removed corpus, not failed replacement uploads.
-- Resolved for AWS-native testing: `csub-pa-mvp-chat-test` serves a public guided interface and uses managed retrieval plus Nova Lite generation.
-- Resolved for the public test boundary: internal metadata, admin and approval paths, and PII-access requests are excluded from generation; live transaction lookup is unsupported.
-- Still open for production: API and frontend hosting, custom domain/CDN, WAF and rate limiting, analytics, feedback storage, and infrastructure-as-code.
+- Resolved for the current corpus: all 80 real files from `CSUBuyP2P` are in canonical S3 storage; 63 documents are text-indexed through source-aware fixed-size chunking and all 17 videos are covered by 300 indexed timestamped segments derived from the canonical VTT transcripts.
+- Resolved for replacement status: the 16 `NOT_FOUND` identifiers were deletion tombstones in the retired Knowledge Base, not failed replacement uploads; they are not part of the active chunked index.
+- Resolved for the production agent runtime: Lambda version `2` is frozen behind the `production` alias, with Sonnet 4.6 generation, Haiku 4.5 citation validation, and version `1` retained for rollback.
+- Resolved for the public boundary: deterministic gates block system actions, live lookups, internal/admin procedures, PII access, prompt injection, and explicit out-of-scope topics; self-reported role is not authorization.
+- Resolved for guided evaluation: 13/13 end-to-end scenarios, 8/8 boundary cases, and 3/3 video timestamp checks passed with no internal-source leakage and 8.193-second p95 end-to-end latency.
+- Still open for campus production hosting: frontend integration, custom domain/CDN, WAF and rate limiting, analytics, feedback storage, and infrastructure-as-code.
 - Should internal/admin sources move to a separate restricted Knowledge Base before production launch?
 - Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
