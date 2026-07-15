@@ -1,6 +1,6 @@
 # AWS Architecture: MVP Baseline
 
-Status: AWS content, retrieval, and production agent behavior provisioned and verified July 14, 2026. The `CSUBuyP2P` corpus is text-searchable using source-aware chunking, all video transcripts are indexed as timestamped segments, and the public no-auth agent is frozen behind a production Lambda alias. Custom web hosting and campus-launch controls remain separate work.
+Status: AWS content, retrieval, production agent behavior, public API protection, and operations plumbing provisioned and verified July 15, 2026. The remaining launch work is frontend integration, its approved domain/CDN, and governance choices.
 
 ## Scope
 
@@ -62,30 +62,46 @@ The previous default-chunked Knowledge Base `KZWZQVCCJW` and data source `UEPVWR
 ### Agent runtime
 
 - Lambda function: `csub-pa-mvp-chat-test`
-- Production alias: `production` -> immutable version `2`
-- Production URL: `https://etwxpbmxee2s6vniis3sgez5m40vorpg.lambda-url.us-west-2.on.aws/`
-- Mutable test URL: `https://pzj5r4vybxqqdl5xfkpy7b5r7i0sytwy.lambda-url.us-west-2.on.aws/`
-- Rollback snapshot: version `1`
+- Production alias: `production` -> immutable version `4`
+- Production API: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
+- API routes: `POST /v1/chat` and `GET /v1/health`
+- Legacy Lambda URLs: retained with `AuthType=AWS_IAM`; no anonymous bypass
+- Rollback snapshots: versions `2` and `1`; failed dependency-incomplete version `3` was removed
 - Runtime: Python 3.13 on ARM64, 256 MB memory, 30-second timeout
 - Generation model: US Anthropic Claude Sonnet 4.6 inference profile
 - Grounding validator: US Anthropic Claude Haiku 4.5 inference profile
-- Public access: Lambda Function URL with `AuthType=NONE`
+- Public access: API Gateway REST API with `AuthorizationType=NONE`, protected by WAF and throttling
 - Execution role: `AmazonBedrockExecutionRoleForLambda_csub_pa_mvp_chat_test`
-- Logs: `/aws/lambda/csub-pa-mvp-chat-test`, retained for 14 days
+- Logs: Lambda, API Gateway, and blocked-request WAF logs retained for 30 days
 - Repository source: `backend/lambda_function.py`
 - Policy tests: `backend/test_lambda_function.py`
 
-The function serves a minimal full-page guided chat interface on `GET` and a JSON chat endpoint on `POST`. It retrieves up to 12 candidates, keeps at most two chunks from any source, and passes at most eight excerpts into generation. Managed reranking is disabled because it is unavailable with a custom embedding model.
+The function supports a versioned JSON chat contract and health endpoint. It retrieves up to 12 candidates, keeps at most two chunks from any source, and passes at most eight excerpts into generation. Managed reranking is disabled because it is unavailable with a custom embedding model.
 
 Requests pass through deterministic gates before retrieval. These gates block submit/approve/edit actions, personalized live lookups, PII-access requests, internal/admin procedures, prompt-injection attempts, and explicit non-procurement topics. Ambiguous software and purchase requests receive guided intake questions. High-frequency workflows use source-verified response templates; remaining answers use Sonnet generation, sentence/line citation checks, Haiku entailment validation, and one constrained repair attempt before failing closed.
 
-The execution role can only call `bedrock:Retrieve` on `3MMHDI5IDU`, invoke the production Sonnet and Haiku inference profiles, invoke Nova Lite for the rollback version, and write this function's CloudWatch logs. It has no S3 access and no procurement-system write permissions.
+The execution role can only call `bedrock:Retrieve` on `3MMHDI5IDU`, invoke the production Sonnet and Haiku inference profiles, invoke Nova Lite for the oldest rollback version, write this function's CloudWatch logs, and publish X-Ray telemetry. It has no S3 access and no procurement-system write permissions.
+
+### API protection and observability
+
+- CloudFormation stack: `csub-pa-production-backend`
+- Regional REST API: `w0vfga8dil`, stage `prod`
+- Request validation: Draft 4 JSON schema for message, role, and bounded history
+- Stage throttling: 5 requests/second, burst 10
+- Regional WAF: body size over 64,000 bytes returns `413`; more than 300 requests per source IP in five minutes returns `429`
+- Access logging: route, status, latency, response length, integration status, and request ID only; request/response data tracing is disabled
+- WAF logging: blocked requests only; sampled requests disabled
+- Tracing: API Gateway and Lambda X-Ray enabled
+- Dashboard: `csub-pa-production`
+- Alert topic: `csub-pa-prod-alerts`; no subscriber is configured because no recipient was approved
+- Alarms: Lambda errors, throttles, p95 duration, API 5xx, API 4xx spike, and caught application failures
+- Infrastructure: `infra/backend.yaml`; deployment: `scripts/deploy_backend.sh`
 
 Amazon Bedrock Agents were evaluated but are not used. The Agent runtime injects a vector-search configuration that is incompatible with this managed Knowledge Base, which requires `managedSearchConfiguration`. The temporary Agent, alias, and Agent execution role were removed after this was verified.
 
 ## Current Verification Status
 
-Last verified July 14, 2026:
+Last verified July 15, 2026:
 
 - Knowledge Base status: `ACTIVE`
 - All three data source statuses: `AVAILABLE`
@@ -97,9 +113,9 @@ Last verified July 14, 2026:
 - A 12-scenario guided retrieval comparison covered supplier onboarding, invitations, receiving, requisition search, default addresses, change requests, support tickets, payment terms, punchout shopping, fiscal year end, voucher status, and supplier status.
 - The replacement returned an expected source in 12/12 scenarios versus 11/12, improved mean expected-source rank from 2.33 to 1.25, improved procedural-term coverage from 88.9% to 94.5%, reduced duplicate context chunks from 54 to 31, and returned useful timestamps in 5/5 video-oriented scenarios versus 2/5.
 - Both configurations returned zero `access_scope=internal` sources under the public-test filter.
-- Production alias URL returns the guided chat page successfully and executes immutable version `2`.
-- The final 36-scenario raw-retrieval suite returned 34/36 exact expected-source hits, 93.1% mean procedural-term coverage, 0 internal-source leaks, 3/3 timestamp passes, and 1.311-second p95 retrieval latency.
-- The final 13-scenario guided end-to-end suite returned 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal-source leaks, 0 duplicate source cards, 3/3 timestamp passes, and 8.193-second p95 latency.
+- API health identifies immutable Lambda version `4`; both direct Lambda URLs reject anonymous requests with `403`.
+- The final 36-scenario raw-retrieval suite returned 34/36 exact expected-source hits, 93.1% mean procedural-term coverage, 0 internal-source leaks, 3/3 timestamp passes, and 1.783-second p95 retrieval latency.
+- The final 13-scenario guided end-to-end suite through API Gateway and WAF returned 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal-source leaks, 0 duplicate source cards, 3/3 timestamp passes, and 9.215-second p95 latency.
 - All 8 boundary cases passed: PII refusal, live lookup, submit action, approve action, prompt injection, unrelated topic, ambiguous software clarification, and self-reported internal-role access.
 - The raw retrieval exceptions remain visible for evaluation: supplier-search and Marketplace end-user exact-source misses, plus partial heuristic term coverage for the forms scenario. Guided end-to-end behavior passed because routing and source-verified workflows are evaluated as the product surface.
 
@@ -134,14 +150,13 @@ The custom connector does not automatically crawl S3. Until a different ingestio
 
 The owner of this approval and synchronization process is still an open governance decision. Event-driven or scheduled synchronization remains deferred.
 
-## Deferred Beyond The Agent Runtime
+## Deferred Beyond The Backend
 
-- Custom domain and CDN
-- Public endpoint rate limiting, WAF, and abuse controls
+- Standalone frontend integration and its approved custom domain/CDN
+- Alert topic recipient confirmation
 - Production analytics and feedback storage
 - Authentication for any future restricted or personalized workflows
 - Physical separation of internal content into a restricted Knowledge Base
-- Infrastructure-as-code for repeatable environment provisioning
 - Automated video transcription and ingestion pipeline; the current 17-video batch was operator-run
 - Scheduled or event-driven Knowledge Base synchronization
 
