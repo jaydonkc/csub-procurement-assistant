@@ -6,6 +6,7 @@ from unittest.mock import patch
 from backend import grounding, policy, retrieval, source_access, workflows
 from backend import lambda_function as app
 from backend.config import ALLOWED_ORIGIN, MEDIA_URL_TTL_SECONDS, SOURCE_BUCKET
+from backend.models import RetrievalDecision
 from backend.pydantic_agent import GroundingFailure
 
 
@@ -14,6 +15,15 @@ def post_event(payload):
         "requestContext": {"http": {"method": "POST"}},
         "body": json.dumps(payload),
     }
+
+
+def retrieve_route(query: str, reason: str = "test") -> RetrievalDecision:
+    return RetrievalDecision(
+        route="retrieve",
+        reply="",
+        search_query=query,
+        reason=reason,
+    )
 
 
 class RequestClassificationTests(unittest.TestCase):
@@ -37,6 +47,18 @@ class RequestClassificationTests(unittest.TestCase):
         )
         self.assertIsNone(route)
 
+    def test_greeting_before_requisition_howto_is_not_treated_as_an_action(self):
+        route = policy.classify_request(
+            "Hi, how do I create a requisition?", "requester"
+        )
+        self.assertIsNone(route)
+
+    def test_greeting_before_direct_action_remains_blocked(self):
+        route = policy.classify_request(
+            "Hi, create a requisition for me.", "requester"
+        )
+        self.assertEqual(route["route"], "transaction_action")
+
     def test_internal_approval_instructions_are_blocked(self):
         route = policy.classify_request(
             "How do I approve a requisition?", "internal_staff"
@@ -57,6 +79,12 @@ class RequestClassificationTests(unittest.TestCase):
 
     def test_requester_status_howto_can_use_public_sources(self):
         route = policy.classify_request("How do I check invoice status?", "requester")
+        self.assertIsNone(route)
+
+    def test_greeting_before_requester_status_howto_can_use_public_sources(self):
+        route = policy.classify_request(
+            "Hello, where do I check invoice status?", "requester"
+        )
         self.assertIsNone(route)
 
     def test_ambiguous_software_request_gets_guided_intake(self):
@@ -192,6 +220,13 @@ class SourceBoundaryTests(unittest.TestCase):
                 "application/pdf",
             ),
         )
+
+    def test_internal_document_never_maps_to_source_object(self):
+        source = {
+            "kind": "document",
+            "path": "Approvals/Taking Action on Requisitions.pdf",
+        }
+        self.assertIsNone(source_access.public_document_object_key(source))
 
     def test_video_without_kind_still_maps_by_canonical_path(self):
         source = {"path": "Receiving/Creating a Receipt.mp4"}
@@ -530,10 +565,28 @@ class HandlerTests(unittest.TestCase):
 
     def test_health_route_reports_service_status(self):
         event = {"httpMethod": "GET", "path": "/v1/health"}
-        result = app.handler(event, None)
+        with patch.object(
+            app, "_clients", side_effect=AssertionError("must not call Bedrock")
+        ):
+            result = app.handler(event, None)
         payload = json.loads(result["body"])
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["service"], "csub-procurement-assistant")
+
+    def test_unknown_post_path_is_rejected(self):
+        result = app.handler(
+            {
+                "httpMethod": "POST",
+                "path": "/v1/admin",
+                "body": json.dumps({"message": "Hello", "role": "requester"}),
+            },
+            None,
+        )
+        self.assertEqual(result["statusCode"], 404)
+
+    def test_path_is_normalized(self):
+        self.assertEqual(app.request_path({"rawPath": "/v1/chat/"}), "/v1/chat")
 
     def test_preflight_includes_cors_headers(self):
         event = {"httpMethod": "OPTIONS", "path": "/v1/chat"}
@@ -544,8 +597,13 @@ class HandlerTests(unittest.TestCase):
         )
 
     def test_fixed_gate_does_not_call_retrieval(self):
-        with patch.object(
-            app, "_retrieve_sources", side_effect=AssertionError("must not retrieve")
+        with (
+            patch.object(
+                app, "_route_request", side_effect=AssertionError("must not route")
+            ),
+            patch.object(
+                app, "_retrieve_sources", side_effect=AssertionError("must not retrieve")
+            ),
         ):
             result = app.handler(
                 post_event(
@@ -561,8 +619,62 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(payload["sources"], [])
         self.assertIn("cannot submit", payload["answer"])
 
+    def test_conversation_route_does_not_call_retrieval(self):
+        decision = RetrievalDecision(
+            route="conversation",
+            reply="Hi! What procurement task can I help you with?",
+            search_query="",
+            reason="greeting",
+        )
+        with (
+            patch.object(app, "_route_request", return_value=decision),
+            patch.object(
+                app, "_retrieve_sources", side_effect=AssertionError("must not retrieve")
+            ),
+        ):
+            result = app.handler(
+                post_event({"message": "hi", "role": "requester"}), None
+            )
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(payload["sources"], [])
+        self.assertIn("Hi!", payload["answer"])
+
+    def test_retrieval_route_uses_rewritten_query(self):
+        decision = retrieve_route(
+            "standalone voucher status guidance", reason="follow_up"
+        )
+        with (
+            patch.object(app, "_route_request", return_value=decision),
+            patch.object(app, "_retrieve_sources", return_value=("", [])) as retrieve,
+        ):
+            result = app.handler(
+                post_event(
+                    {
+                        "message": "Where do I check that?",
+                        "role": "requester",
+                        "history": [
+                            {
+                                "role": "user",
+                                "text": "I need voucher status guidance.",
+                            }
+                        ],
+                    }
+                ),
+                None,
+            )
+        self.assertEqual(result["statusCode"], 200)
+        retrieve.assert_called_once_with("standalone voucher status guidance")
+
     def test_no_source_result_fails_closed(self):
-        with patch.object(app, "_retrieve_sources", return_value=("", [])):
+        with (
+            patch.object(
+                app,
+                "_route_request",
+                return_value=retrieve_route("undocumented exception"),
+            ),
+            patch.object(app, "_retrieve_sources", return_value=("", [])),
+        ):
             result = app.handler(
                 post_event(
                     {
@@ -589,6 +701,11 @@ class HandlerTests(unittest.TestCase):
         )
         with (
             patch.object(
+                app,
+                "_route_request",
+                return_value=retrieve_route("what should I do next"),
+            ),
+            patch.object(
                 app, "_retrieve_sources", return_value=("[S1] source", sources)
             ),
             patch.object(workflows, "guided_template_answer", return_value=None),
@@ -610,6 +727,11 @@ class HandlerTests(unittest.TestCase):
         fake_agent = unittest.mock.Mock()
         fake_agent.run_grounded.side_effect = GroundingFailure("unsupported_claim")
         with (
+            patch.object(
+                app,
+                "_route_request",
+                return_value=retrieve_route("what should I do next"),
+            ),
             patch.object(
                 app, "_retrieve_sources", return_value=("[S1] source", sources)
             ),
@@ -650,6 +772,9 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(result["statusCode"], 200)
         self.assertIn(
             "frame-ancestors 'none'", result["headers"]["content-security-policy"]
+        )
+        self.assertEqual(
+            result["headers"]["access-control-allow-origin"], ALLOWED_ORIGIN
         )
 
 

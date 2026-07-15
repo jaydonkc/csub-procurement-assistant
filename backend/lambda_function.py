@@ -24,11 +24,13 @@ from backend.config import (
     MAX_CONTEXT_EXCERPTS,
     MEDIA_URL_TTL_SECONDS,
     MODEL_ID,
+    ROUTER_MODEL_ID,
     SOURCE_BUCKET,
     VALIDATOR_MODEL_ID,
 )
-from backend.models import ChatRequest, ChatResponse
+from backend.models import ChatRequest, ChatResponse, RetrievalDecision
 from backend.pydantic_agent import GroundingFailure, ProcurementAgent
+from backend.router import retrieval_fallback
 from backend.ui import INDEX_HTML
 
 
@@ -65,6 +67,7 @@ def _pydantic_runtime() -> ProcurementAgent:
             bedrock_runtime=bedrock_runtime,
             model_id=MODEL_ID,
             validator_model_id=VALIDATOR_MODEL_ID,
+            router_model_id=ROUTER_MODEL_ID,
         )
         _procurement_agent_client_id = client_id
     return _procurement_agent
@@ -139,6 +142,22 @@ def _retrieve_sources(message: str) -> tuple[str, list[dict[str, Any]]]:
         max_context_excerpts=MAX_CONTEXT_EXCERPTS,
         max_chunks_per_source=MAX_CHUNKS_PER_SOURCE,
     )
+
+
+def _route_request(
+    message: str,
+    role: str,
+    history: list[dict[str, str]],
+) -> RetrievalDecision:
+    try:
+        decision = _pydantic_runtime().decide_retrieval(
+            message=message,
+            role=role,
+            history=history,
+        )
+    except Exception:
+        return retrieval_fallback(message)
+    return decision if isinstance(decision, RetrievalDecision) else retrieval_fallback(message)
 
 
 def _sources_with_urls(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -229,7 +248,24 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             )
             return response(200, _chat_payload(route["answer"], [], request_id))
 
-        source_context, sources = _retrieve_sources(message)
+        retrieval_decision = _route_request(message, role, history)
+        if retrieval_decision.route != "retrieve":
+            _log(
+                "request_complete",
+                request_id,
+                route=retrieval_decision.route,
+                route_reason=retrieval_decision.reason,
+                source_count=0,
+                grounding="not_applicable",
+            )
+            return response(
+                200,
+                _chat_payload(retrieval_decision.reply, [], request_id),
+            )
+
+        source_context, sources = _retrieve_sources(
+            retrieval_decision.search_query
+        )
         if not sources:
             answer = (
                 "I could not find an approved public source that supports a reliable answer, so I will not guess. "
@@ -239,6 +275,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "request_complete",
                 request_id,
                 route="no_public_source",
+                route_reason=retrieval_decision.reason,
                 source_count=0,
                 grounding="not_applicable",
             )
@@ -254,6 +291,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "request_complete",
                 request_id,
                 route="guided_template",
+                route_reason=retrieval_decision.reason,
                 source_count=len(guided_sources),
                 grounding="source_terms_verified",
             )
@@ -277,6 +315,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "request_complete",
                 request_id,
                 route="grounding_fallback",
+                route_reason=retrieval_decision.reason,
                 source_count=len(fallback_sources),
                 grounding=exc.reason,
             )
@@ -289,6 +328,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "request_complete",
             request_id,
             route="grounded_answer",
+            route_reason=retrieval_decision.reason,
             source_count=len(cited_sources),
             grounding=agent_run.grounding,
             repaired=agent_run.repaired,
