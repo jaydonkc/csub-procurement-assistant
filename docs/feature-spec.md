@@ -4,7 +4,7 @@
 
 The solution is a standalone, role-aware RAG chatbot and guided procurement assistant for CSUB requesters, vendors, and internal support stakeholders. It helps users determine the correct purchasing path in CSUBUY/P2P, understand required approvals and supplier steps, find the right forms, and navigate procurement guidance without reading long PDFs or watching full training videos.
 
-The MVP is a guidance layer only. It does not submit requisitions, modify ServiceNow, write to CFS, approve purchases, or replace Procurement staff.
+The MVP is a no-auth public guidance layer only. It does not create user accounts, submit requisitions, modify ServiceNow, write to CFS, approve purchases, perform personalized status lookups, or replace Procurement staff.
 
 ## Primary Users
 
@@ -68,6 +68,7 @@ Behavior:
 - Use role-specific wording and escalation paths.
 - Avoid exposing internal-only documents to vendors unless approved.
 - Keep requester, vendor, and internal process flows separate enough to extend independently.
+- Treat role as self-reported context only, not as authorization.
 
 Output:
 - Role-aware answer.
@@ -79,6 +80,7 @@ Acceptance criteria:
 - A vendor registration question receives vendor-facing guidance, not requester-facing internal purchasing instructions.
 - A requester buying question receives purchase path and checklist guidance.
 - Internal-only or restricted sources are not exposed to vendors unless marked safe.
+- Role selection does not unlock restricted content in the no-auth MVP.
 
 ### F2. Source-Grounded RAG Retrieval
 
@@ -101,6 +103,7 @@ Data sources:
 
 Behavior:
 - Index approved source documents.
+- Index only sources approved for no-auth public exposure in the MVP.
 - Retrieve relevant chunks for each query.
 - Rank CSUB-specific material above CSU-wide material when both apply.
 - Return document title, section/page, URL, and date/version when available.
@@ -115,6 +118,7 @@ Acceptance criteria:
 - Each answer shows the source document used.
 - CSUB-specific documents are preferred over CSU-wide documents for campus-specific procedures.
 - If sources conflict, the assistant surfaces the conflict and recommends contacting the responsible office.
+- Restricted, internal-only, user-specific, supplier-specific, invoice-specific, or payment-specific data is excluded from no-auth retrieval.
 
 ### F3. Guided Procurement Pathfinder
 
@@ -317,6 +321,7 @@ MVP behavior:
 - Explain how to check requisition status in P2P/ServiceNow.
 - Explain common status meanings if source material exists.
 - Identify common blockers and where to follow up.
+- Do not retrieve or display personalized requisition status.
 
 Post-MVP behavior:
 - Read-only integration with ServiceNow/P2P to retrieve live status.
@@ -330,6 +335,7 @@ Output:
 Acceptance criteria:
 - MVP does not claim live requisition status unless integration exists.
 - Status guidance is grounded in source documentation.
+- No-auth MVP only provides general status guidance, not user-specific status lookup.
 
 ### F9A. Vendor Onboarding And Invoice Guidance
 
@@ -349,6 +355,7 @@ Behavior:
 - Route unresolved supplier setup issues to Supplier Management.
 - Route invoice/payment issues to Accounts Payable when appropriate.
 - Avoid exposing internal procurement-only materials to vendors unless approved.
+- Do not retrieve personalized supplier, invoice, or payment status in the no-auth MVP.
 
 Output:
 - Vendor-facing step-by-step guidance.
@@ -361,6 +368,7 @@ Acceptance criteria:
 - A new vendor can understand what to do next without reading internal procurement documentation.
 - Vendor invoice questions route to AP or the correct source-backed process.
 - The assistant does not expose restricted internal guidance to vendors.
+- The assistant does not expose supplier-specific, invoice-specific, or payment-specific information without authentication.
 
 ### F10. Admin Knowledge Base Management
 
@@ -450,14 +458,18 @@ Acceptance criteria:
 
 ## Explicit Non-Features For MVP
 
+- No authentication, SSO, Cognito, or user accounts.
 - No requisition submission.
 - No purchase approval.
 - No write-back to ServiceNow.
 - No write-back to CFS.
 - No supplier registration submission.
+- No personalized requisition status lookup.
+- No supplier-specific, invoice-specific, or payment-specific lookup.
 - No final legal/procurement determination without source support.
 - No replacement for Procurement, AP, ITS, Supplier Management, or Solutions Consulting.
 - No campus-agnostic CSU answer when CSUB-specific guidance exists.
+- No indexing of restricted/internal-only sources unless they are explicitly approved for no-auth public use.
 
 ## Data Model Requirements
 
@@ -474,7 +486,7 @@ Each source document should include:
 - Version if available.
 - Active/retired status.
 - Priority level.
-- Access level.
+- Access level: public_or_approved_no_auth, internal_only, restricted, user_specific, supplier_specific, invoice_specific, or payment_specific.
 
 Each answer should store:
 - User query.

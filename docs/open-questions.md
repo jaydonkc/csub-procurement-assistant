@@ -11,8 +11,8 @@
 
 - Which user roles should appear in the first screen: requester, vendor, internal staff, or all three?
 - Are vendors allowed to access the same assistant as CSUB employees?
-- Should answers change based on authentication, role, department, or campus affiliation?
-- Are student worker access rules safe to expose to all users, or only authenticated CSUB users?
+- Should answers change based on self-reported role, department, or campus affiliation?
+- Are student worker access rules safe to expose in a no-auth public assistant?
 
 ## Source Access
 
@@ -33,11 +33,19 @@
 
 ## AWS And Implementation
 
-- Which AWS account or campus environment will host the prototype?
-- Are there preferred AWS services for retrieval, chat orchestration, authentication, storage, logging, or deployment?
-- Are Bedrock, OpenSearch, S3, Lambda, ECS, App Runner, or Cognito approved for this project?
+- Resolved: the prototype uses AWS account `335010339891` in `us-west-2`, accessed through CLI profile `summercamp`.
+- Resolved for content and retrieval: private Amazon S3 source storage plus an Amazon Bedrock managed Knowledge Base.
+- Resolved for the current account policy: S3 Vectors and the native Bedrock S3 crawler path are unavailable, so approved objects are submitted through a managed custom connector using an authenticated `summercamp` operator session.
+- Resolved for the current corpus: all 80 real files from `CSUBuyP2P` are in canonical S3 storage; 63 documents are text-indexed and 17 videos are represented by indexed timestamped transcripts.
+- Resolved for replacement status: the 16 `NOT_FOUND` identifiers are deletion tombstones from the removed corpus, not failed replacement uploads.
+- Resolved for AWS-native testing: `csub-pa-mvp-chat-test` serves a public guided interface and uses managed retrieval plus Nova Lite generation.
+- Resolved for the public test boundary: internal metadata, admin and approval paths, and PII-access requests are excluded from generation; live transaction lookup is unsupported.
+- Still open for production: API and frontend hosting, custom domain/CDN, WAF and rate limiting, analytics, feedback storage, and infrastructure-as-code.
+- Should internal/admin sources move to a separate restricted Knowledge Base before production launch?
+- Who owns approving and synchronizing future S3 source changes into the custom connector?
 - Are there data retention or logging restrictions for user questions?
-- Will the prototype need SSO or can it start unauthenticated for demo purposes?
+- Which source types are approved for no-auth public exposure?
+- What authentication model would be required in a future phase for restricted sources or personalized status lookup?
 
 ## Evaluation
 
@@ -46,4 +54,3 @@
 - What vendor onboarding questions happen most often?
 - What invoice or payment questions do vendors ask most often?
 - What baseline metrics exist for cycle time, rework rate, on-contract spend, supplier registration time, and requester satisfaction?
-
