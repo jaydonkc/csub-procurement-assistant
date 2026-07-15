@@ -187,7 +187,14 @@ ACTION_PATTERN = re.compile(
 )
 
 GENERAL_HOWTO_PATTERN = re.compile(
-    r"^(?:please\s+)?(?:how|where|when|why|what)\b|\b(?:steps|instructions?|walk me through|guidance)\b",
+    r"^(?:please\s+)?(?:how|where|when|why|what)\b|"
+    r"\b(?:how|where|when|why|what)\s+(?:do|does|should|can)\b|"
+    r"\b(?:steps|instructions?|walk me through|guidance)\b",
+    re.IGNORECASE,
+)
+
+DIRECT_AGENT_ACTION_PATTERN = re.compile(
+    r"\b(?:(?:can|could|will|would)\s+you|for me|on my behalf|right now)\b",
     re.IGNORECASE,
 )
 
@@ -236,6 +243,16 @@ QUERY_EXPANSIONS = (
         ("software", "subscription", "cloud"),
         tuple(),
         "technology software cloud subscription purchase review CSUBUY",
+    ),
+    (
+        ("profile",),
+        ("update", "change", "edit", "preference"),
+        "User Profile Update View My Profile sidebar preferences notification preferences",
+    ),
+    (
+        ("supplier", "vendor"),
+        ("invite", "invited", "invitation", "register", "registration"),
+        "supplier registration invitation Invited In Progress Profile Complete Approved noreply Jaggaer",
     ),
 )
 
@@ -377,6 +394,8 @@ def _without_leading_pleasantry(message: str) -> str:
 def _is_action_request(message: str) -> bool:
     if not ACTION_PATTERN.search(message):
         return False
+    if DIRECT_AGENT_ACTION_PATTERN.search(message):
+        return True
     return not GENERAL_HOWTO_PATTERN.search(_without_leading_pleasantry(message))
 
 
@@ -428,12 +447,7 @@ def classify_request(message: str, role: str) -> dict[str, str] | None:
         return {"route": "prompt_attack", "answer": FIXED_RESPONSES["prompt_attack"]}
     if _is_action_request(message):
         return {"route": "transaction_action", "answer": FIXED_RESPONSES["transaction_action"]}
-    vendor_status_request = (
-        role == "vendor"
-        and LIVE_OBJECT_PATTERN.search(message)
-        and LIVE_LOOKUP_PATTERN.search(message)
-    )
-    if _is_live_lookup(message) or vendor_status_request:
+    if _is_live_lookup(message):
         return {"route": "live_lookup", "answer": FIXED_RESPONSES["live_lookup"]}
     if _contains_pattern(message, INTERNAL_PROCEDURE_PATTERNS):
         return {"route": "internal_procedure", "answer": FIXED_RESPONSES["internal_procedure"]}
@@ -467,7 +481,9 @@ def generation_hint(message: str) -> str:
             "status follow-up, and escalation. Use at most six checklist items and 350 words. Omit detailed status branches or "
             "extension-request advice unless each is explicit in the cited excerpt."
         )
-    if "voucher" in lowered and "status" in lowered:
+    voucher_status_question = "voucher" in lowered and "status" in lowered
+    voucher_status_follow_up = bool(re.search(r"\bwhat\s+(?:does|do)\s+(?:it|they)\s+show\b", lowered))
+    if voucher_status_question or voucher_status_follow_up:
         return (
             "State only the documented navigation path and the fields or values explicitly shown. Do not infer who has access, "
             "define statuses beyond the excerpt, or claim that the excerpt lists every possible status."
@@ -653,6 +669,7 @@ def guided_template_answer(
     message: str,
     context: str,
     sources: list[dict[str, Any]],
+    role: str = "requester",
 ) -> tuple[str, list[dict[str, Any]]] | None:
     """Return source-verified copy for a narrow, high-frequency workflow."""
     lowered = message.casefold()
@@ -677,6 +694,225 @@ def guided_template_answer(
                     answer += f" The retrieved training segment is **{timestamp}** [{source_id}]."
                     cited_source["timestamp"] = timestamp
                 return answer, [cited_source]
+
+    if "5,000" in lowered and "procurement review" in lowered and "exact" in lowered:
+        source = next(
+            (item for item in sources if item["path"].endswith("Procurement/Review Requirements - Procurement.pdf")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold().replace(" ", "")
+            required_terms = (">$5,000", "<$5,000", "allconditionsmustbemet")
+            if all(term.casefold().replace(" ", "") in excerpt for term in required_terms):
+                source_id = source["id"]
+                answer = (
+                    f"The source says a requisition containing only punchout or catalog items requires Procurement Review when it is **greater than $5,000** [{source_id}]. "
+                    f"It says the low-risk bypass requires all listed conditions, including a total **less than $5,000** [{source_id}]. "
+                    f"Because neither rule includes an amount exactly equal to $5,000, the supplied source does not establish whether that exact amount triggers or bypasses review; confirm the equality case with CSUB Procurement."
+                )
+                return answer, [source]
+
+    if role == "vendor" and "invoice" in lowered and any(
+        phrase in lowered for phrase in ("payment status", "pay status", "check status", "been paid")
+    ):
+        source = next(
+            (item for item in sources if item["path"].endswith("Invoicing and Vouchers/Voucher Pay Status.pdf")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold()
+            required_terms = ("viewable by requestors and accounts payable", "orders > search > vouchers", "pay status")
+            if all(term in excerpt for term in required_terms):
+                source_id = source["id"]
+                answer = f"""The retrieved public guidance does not establish a vendor-facing email address or portal for submitting invoices, so I cannot safely provide one. Confirm the submission method with your campus requester or CSUB Accounts Payable.
+
+For payment status, the documented CSUBUY view is available to **requestors and Accounts Payable**, not described as a vendor view [{source_id}]. A campus requester or Accounts Payable user can go to **Orders > Search > Vouchers** and review the **Pay Status** column or open the voucher's Payment Information section [{source_id}].
+
+I cannot look up a particular invoice or payment. Do not send invoice numbers, tax records, banking details, or other sensitive information in this chat."""
+                return answer, [source]
+
+    if "supplier" in lowered and "invitation" in lowered and any(
+        phrase in lowered for phrase in ("did not receive", "didn't receive", "never received", "not receive")
+    ):
+        source = next(
+            (item for item in sources if item["path"].endswith("Suppliers/Supplier Did Not Receive Invitation.pdf")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold()
+            required_terms = ("view history", "re-invite request", "noreply@jaggaer.com", "new supplier request", "whitelist")
+            if all(term in excerpt for term in required_terms):
+                source_id = source["id"]
+                if role == "vendor":
+                    answer = f"""If you did not receive the supplier-registration invitation:
+
+1. Ask your campus contact or CSUBUY administrator to verify the invited email address in the supplier profile [{source_id}].
+2. If the address is correct, they can submit a **Re-Invite Request**; then look for mail from **noreply@jaggaer.com** and check junk or spam [{source_id}].
+3. If the address is wrong, give the campus contact the correct registration contact so they can submit a new supplier request [{source_id}].
+4. If the message is still missing, ask your IT team to locate it and allow the **jaggaer.com** domain [{source_id}]."""
+                else:
+                    answer = f"""If the supplier did not receive its registration invitation:
+
+1. Find the supplier profile and use **View History** to verify the invited email address [{source_id}].
+2. If the address is correct, submit a **Re-Invite Request**; after it is completed, tell the supplier when it was sent and to check for **noreply@jaggaer.com** in junk or spam [{source_id}].
+3. If the address is wrong, submit a **New Supplier Request** with the corrected contact [{source_id}].
+4. If delivery still fails, ask the supplier's IT team to locate the message and allow the **jaggaer.com** domain [{source_id}]."""
+                return answer, [source]
+
+    if role == "vendor" and any(term in lowered for term in ("invited", "invitation")) and any(
+        term in lowered for term in ("register", "registration", "supplier", "vendor")
+    ):
+        source = next(
+            (item for item in sources if item["path"].endswith("Suppliers/Requesting a New Supplier.pdf")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold()
+            required_terms = ("invited", "in progress", "profile complete", "approved")
+            if all(term in excerpt for term in required_terms):
+                source_id = source["id"]
+                answer = f"""Use the invitation to begin and complete your supplier registration. The documented status sequence is:
+
+1. **Invited** — the invitation was sent but has not yet been accepted [{source_id}].
+2. **In Progress** — the invitation was accepted and login credentials were created; finish the remaining registration fields [{source_id}].
+3. **Profile Complete** — the profile was submitted and is waiting for Supplier Management review [{source_id}].
+4. **Approved** — Supplier Management completed review and activated the profile in CSUBUY [{source_id}].
+
+If you cannot open the invitation or complete registration, contact the campus requester or CSUBUY support rather than sending sensitive tax or banking information through this chat."""
+                return answer, [source]
+
+    if "withdraw" in lowered and "requisition" in lowered:
+        source = next(
+            (item for item in sources if item["path"].endswith("Shopping and Requistions/Withdraw a Requisition.pdf")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold()
+            required_terms = ("orders > search > requisitions", "pending status", "withdraw entire requisition", "reason", "cannot be reinstated", "click ok")
+            if all(term in excerpt for term in required_terms):
+                source_id = source["id"]
+                answer = f"""You can withdraw a requisition only while it is in **Pending** status [{source_id}].
+
+1. Go to **Orders > Search > Requisitions** [{source_id}].
+2. Open the requisition you want to withdraw [{source_id}].
+3. From **Approve/Complete & Show Next**, select **Withdraw Entire Requisition** [{source_id}].
+4. Enter the withdrawal reason; text beyond the field limit is truncated, and the saved note appears in document history [{source_id}].
+5. Select **OK** to withdraw it, or **Cancel** to leave it unchanged [{source_id}].
+
+A withdrawn requisition cannot be reinstated [{source_id}]."""
+                return answer, [source]
+
+    if "change request" in lowered and "new line" not in lowered and any(
+        term in lowered for term in ("cfs", "submit", "verify", "status")
+    ):
+        document = next(
+            (item for item in sources if item["path"].endswith("Shopping and Requistions/Submitting a Change Request.pdf")),
+            None,
+        )
+        video = next(
+            (
+                item
+                for item in sources
+                if item["path"].endswith(
+                    "Shopping and Requistions/Submitting a Change Request (CSU10_POChangeRequest_V2).mp4"
+                )
+            ),
+            None,
+        )
+        if document and video:
+            document_excerpt = context_for_citations(context, {document["id"]}).casefold()
+            video_excerpt = context_for_citations(context, {video["id"]}).casefold()
+            document_terms = ("vouchers", "payments", "receipts", "document actions", "create change request")
+            video_terms = ("reason", "supporting document", "submit request", "history tab", "cfs")
+            if all(term in document_excerpt for term in document_terms) and all(
+                term in video_excerpt for term in video_terms
+            ):
+                document_id = document["id"]
+                video_id = video["id"]
+                answer = f"""Before creating a PO change request, review the current PO for vouchers, payments, or receipts; existing activity can prevent or alter the change, so coordinate exceptions and supplier-impacting changes with Procurement [{document_id}].
+
+1. Go to **Orders > Search > Purchase Orders** and locate the PO [{document_id}].
+2. Select **Document Actions > Create Change Request** [{document_id}].
+3. Choose notification recipients, enter the reason, and add a supporting document when needed [{video_id}].
+4. Select **Create Change Request**, then select **Submit Request** when it is ready [{video_id}].
+5. After approval, the change merges with the PO and is sent to the supplier and CFS when applicable [{video_id}].
+6. To verify CFS status, open the PO's **History** tab and expand **Summary** [{video_id}]."""
+                return answer, [document, video]
+
+    if "payment terms" in lowered and any(term in lowered for term in ("update", "change", "edit")):
+        source = next(
+            (item for item in sources if item["path"].endswith("Procurement/Updating PO Payment Terms.mp4")),
+            None,
+        )
+        if source:
+            excerpt = context_for_citations(context, {source["id"]}).casefold()
+            required_terms = ("orders", "purchase orders", "po information", "payment terms", "standard payment terms", "save")
+            if all(term in excerpt for term in required_terms):
+                source_id = source["id"]
+                timestamp = timestamp_for_phrase(context, source_id, "purchase orders") or source.get("timestamp")
+                cited_source = dict(source)
+                answer = f"""To update payment terms on a purchase order:
+
+1. Go to **Orders > Purchase Orders** and locate the PO [{source_id}].
+2. Select the edit icon for **PO Information** [{source_id}].
+3. Open the **Payment Terms** field [{source_id}].
+4. Use **Override Discount Terms** only when custom terms are needed [{source_id}].
+5. Choose the required value from **Standard Payment Terms** and review the populated discount fields [{source_id}].
+6. Select **Save** [{source_id}]."""
+                if timestamp:
+                    answer += f"\n\nThe relevant training segment is **{timestamp}** [{source_id}]."
+                    cited_source["timestamp"] = timestamp
+                return answer, [cited_source]
+
+    if "punchout" in lowered and "cart" in lowered:
+        document = next(
+            (item for item in sources if item["path"].endswith("Shopping and Requistions/How to Shop.pdf")),
+            None,
+        )
+        video = next(
+            (
+                item
+                for item in sources
+                if item["path"].endswith("Shopping and Requistions/Shop Using a Punchout Catalog.mp4")
+            ),
+            None,
+        )
+        if document and video:
+            document_excerpt = context_for_citations(context, {document["id"]}).casefold()
+            video_excerpt = context_for_citations(context, {video["id"]}).casefold()
+            document_terms = (
+                "shopping home page",
+                "showcases",
+                "add to cart",
+                "view cart",
+                "shipping",
+                "return you to your csubuy cart",
+            )
+            video_supported = any(
+                term in video_excerpt for term in ("shopping home page", "redirect to the csu buy shopping cart")
+            )
+            if all(term in document_excerpt for term in document_terms) and video_supported:
+                document_id = document["id"]
+                video_id = video["id"]
+                timestamp = (
+                    timestamp_for_phrase(context, video_id, "shopping home page")
+                    or timestamp_for_phrase(context, video_id, "redirect to the CSU buy shopping cart")
+                    or video.get("timestamp")
+                )
+                cited_video = dict(video)
+                answer = f"""To shop through a punchout catalog:
+
+1. From the **Shopping Home Page**, open **Showcases** and select the supplier's punchout catalog [{document_id}].
+2. Shop on the supplier site, add the needed items to its cart, and open **View Cart** [{document_id}].
+3. Enter the shipping information, including the ZIP code and shipping method [{document_id}].
+4. Select **Punchout** on the supplier site to return the selected items to your CSUBUY cart [{document_id}].
+5. In CSUBUY, review the required cart fields and proceed to checkout; then verify the accounting fields before submitting the request [{video_id}].
+
+You may use **Cancel PunchOut** to leave the supplier site and return to CSUBUY without continuing [{document_id}]."""
+                if timestamp:
+                    answer += f"\n\nThe relevant training segment is **{timestamp}** [{video_id}]."
+                    cited_video["timestamp"] = timestamp
+                return answer, [document, cited_video]
 
     if "default" in lowered and "address" in lowered:
         source = next(
@@ -769,7 +1005,9 @@ If the supplier appears in search results or you are unsure which profile/status
 If the correct fiscal year is uncertain, confirm the date with the campus Procurement team before submission."""
                 return answer, [source]
 
-    if "voucher" in lowered and "status" in lowered:
+    voucher_status_question = "voucher" in lowered and "status" in lowered
+    voucher_status_follow_up = bool(re.search(r"\bwhat\s+(?:does|do)\s+(?:it|they)\s+show\b", lowered))
+    if voucher_status_question or voucher_status_follow_up:
         source = next(
             (item for item in sources if item["path"].endswith("Invoicing and Vouchers/Voucher Pay Status.pdf")),
             None,
@@ -1207,7 +1445,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             )
             return response(200, {"answer": answer, "sources": [], "request_id": request_id})
 
-        guided_answer = guided_template_answer(message, source_context, sources)
+        guided_answer = guided_template_answer(message, source_context, sources, role)
         if guided_answer:
             answer, guided_sources = guided_answer
             guided_sources = sources_with_urls(guided_sources)

@@ -1,16 +1,16 @@
 # Agent Production Readiness
 
-Status: the public frontend, backend, and production agent behavior were verified end to end on July 15, 2026. A CSUB-approved custom domain and governance choices remain external decisions.
+Status: ready for the defined public, no-auth, guidance-only MVP scope. The frontend, backend, grounding, citations, role wording, capability boundaries, and production agent behavior were verified end to end on July 15, 2026. A CSUB-approved custom domain and institutional governance choices remain external decisions before a formal campus launch.
 
 ## Frozen Runtime
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `10`
+- Version: `14`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Immediate predecessor: `9` (source links without conditional retrieval); version `8` retains conditional retrieval and video playback
+- Immediate rollback predecessor: `13`
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -56,11 +56,13 @@ The agent cannot submit, approve, edit, withdraw, reject, or look up transaction
 
 Final post-deployment run through API Gateway and WAF:
 
-- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.783-second p95.
-- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 9.215-second p95.
+- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.569-second p95.
+- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 4.749-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
-- Conditional retrieval/source-link live check: 9/9 routing scenarios passed; `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
-- Local policy/API suite: 78/78 passed.
+- Role and behavior acceptance: 13/13 passed, including greetings and thanks without sources, mixed greeting/procedure retrieval, generic vendor guidance, personalized lookup and direct-action refusal, vendor registration, exact-threshold uncertainty, software clarification, prompt injection, out-of-scope routing, video links, and contextual follow-ups.
+- Re-run the public role and behavior contract with `python3 scripts/test_live_agent.py`; pass `--verbose` to retain per-scenario evidence in terminal output.
+- `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
+- Local policy/API suite: 92/92 passed.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 

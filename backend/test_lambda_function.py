@@ -48,9 +48,20 @@ class RequestClassificationTests(unittest.TestCase):
         self.assertEqual(route["route"], "live_lookup")
         self.assertIn("do not have live access", route["answer"])
 
-    def test_vendor_status_howto_still_states_live_capability_boundary(self):
+    def test_vendor_status_howto_can_use_public_guidance(self):
         route = app.classify_request("How do I check invoice status?", "vendor")
-        self.assertEqual(route["route"], "live_lookup")
+        self.assertIsNone(route)
+
+    def test_vendor_invoice_guidance_is_not_treated_as_an_action(self):
+        route = app.classify_request(
+            "As a vendor, where should I send an invoice and how can I check payment status?",
+            "vendor",
+        )
+        self.assertIsNone(route)
+
+    def test_direct_agent_action_remains_blocked_when_worded_as_a_question(self):
+        route = app.classify_request("How can you submit invoice 12345 for me?", "vendor")
+        self.assertEqual(route["route"], "transaction_action")
 
     def test_requester_status_howto_can_use_public_sources(self):
         route = app.classify_request("How do I check invoice status?", "requester")
@@ -256,6 +267,14 @@ class SourceBoundaryTests(unittest.TestCase):
         query = app.build_retrieval_query("How does a marketplace end user shop?")
         self.assertIn("Marketplace End User Training", query)
 
+    def test_query_expansion_targets_profile_intro_segment(self):
+        query = app.build_retrieval_query("How do I update my user profile?")
+        self.assertIn("View My Profile", query)
+
+    def test_query_expansion_targets_supplier_invitation_statuses(self):
+        query = app.build_retrieval_query("I am a vendor invited to register.")
+        self.assertIn("Profile Complete", query)
+
     def test_new_supplier_generation_hint_limits_unsupported_branches(self):
         hint = app.generation_hint("I cannot find a supplier. Should I request a new supplier?")
         self.assertIn("Omit detailed status branches", hint)
@@ -275,6 +294,17 @@ class SourceBoundaryTests(unittest.TestCase):
         result = app.guided_template_answer("Where do I review voucher status?", context, sources)
         self.assertIsNotNone(result)
         self.assertIn("cannot view a live voucher", result[0])
+
+    def test_voucher_template_handles_resolved_contextual_follow_up(self):
+        sources = [{"id": "S1", "path": "Invoicing and Vouchers/Voucher Pay Status.pdf"}]
+        context = (
+            "[S1] Invoicing and Vouchers/Voucher Pay Status.pdf\n"
+            "Go to Orders > Search > Vouchers. The Pay Status column is shown. "
+            "Open Payment Information for payment process details."
+        )
+        result = app.guided_template_answer("What does it show?", context, sources)
+        self.assertIsNotNone(result)
+        self.assertIn("Pay Status", result[0])
 
     def test_voucher_template_fails_closed_when_source_terms_are_missing(self):
         sources = [{"id": "S1", "path": "Invoicing and Vouchers/Voucher Pay Status.pdf"}]
@@ -356,6 +386,139 @@ class SourceBoundaryTests(unittest.TestCase):
         result = app.guided_template_answer("How do I update my profile?", context, sources)
         self.assertIn("00:00:06.000 --> 00:01:14.000", result[0])
         self.assertEqual(result[1][0]["timestamp"], "00:00:06.000 --> 00:01:14.000")
+
+    def test_exact_five_thousand_threshold_preserves_equality_gap(self):
+        sources = [{"id": "S1", "path": "Procurement/Review Requirements - Procurement.pdf"}]
+        context = (
+            "[S1] source\nPunchout or catalog items >$5,000 require review. "
+            "The bypass requires all conditions must be met, including <$5,000."
+        )
+        result = app.guided_template_answer(
+            "At exactly $5,000, does this trigger Procurement Review?",
+            context,
+            sources,
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("does not establish", result[0])
+        self.assertIn("[S1]", result[0])
+
+    def test_vendor_invoice_guidance_preserves_submission_gap_and_status_path(self):
+        sources = [{"id": "S1", "path": "Invoicing and Vouchers/Voucher Pay Status.pdf"}]
+        context = (
+            "[S1] source\nThis information is viewable by requestors and accounts payable. "
+            "Navigate to Orders > Search > Vouchers and review the Pay Status column."
+        )
+        result = app.guided_template_answer(
+            "Where should I send an invoice and how can I check payment status?",
+            context,
+            sources,
+            "vendor",
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("does not establish a vendor-facing", result[0])
+        self.assertIn("Orders > Search > Vouchers", result[0])
+        self.assertIn("[S1]", result[0])
+
+    def test_missing_supplier_invitation_template_is_role_aware(self):
+        sources = [{"id": "S1", "path": "Suppliers/Supplier Did Not Receive Invitation.pdf"}]
+        context = (
+            "[S1] source\nUse View History. Submit a Re-Invite Request and check noreply@jaggaer.com. "
+            "Use a New Supplier Request for a corrected email and ask IT to whitelist jaggaer.com."
+        )
+        result = app.guided_template_answer(
+            "The supplier never received its invitation.",
+            context,
+            sources,
+            "vendor",
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("campus contact", result[0])
+        self.assertIn("junk or spam", result[0])
+
+    def test_vendor_invitation_template_explains_status_sequence(self):
+        sources = [{"id": "S1", "path": "Suppliers/Requesting a New Supplier.pdf"}]
+        context = "[S1] source\nInvited, In Progress, Profile Complete, and Approved are registration statuses."
+        result = app.guided_template_answer(
+            "I am a vendor invited to register. What happens next?",
+            context,
+            sources,
+            "vendor",
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("finish the remaining registration fields", result[0])
+
+    def test_withdraw_template_preserves_complete_irreversible_sequence(self):
+        sources = [{"id": "S1", "path": "Shopping and Requistions/Withdraw a Requisition.pdf"}]
+        context = (
+            "[S1] source\nOrders > Search > Requisitions. Pending status. Withdraw Entire Requisition. "
+            "Enter a reason. It cannot be reinstated. Click OK."
+        )
+        result = app.guided_template_answer("How do I withdraw a requisition?", context, sources)
+        self.assertIsNotNone(result)
+        self.assertIn("cannot be reinstated", result[0])
+        self.assertIn("5. Select **OK**", result[0])
+
+    def test_change_request_template_covers_precheck_submission_and_cfs(self):
+        sources = [
+            {"id": "S1", "path": "Shopping and Requistions/Submitting a Change Request.pdf"},
+            {
+                "id": "S2",
+                "path": "Shopping and Requistions/Submitting a Change Request (CSU10_POChangeRequest_V2).mp4",
+            },
+        ]
+        context = (
+            "[S1] source\nReview vouchers, payments, receipts. Use Document Actions and Create Change Request.\n\n"
+            "[S2] source\nEnter a reason and supporting document. Select Submit Request. Check the History tab for CFS."
+        )
+        result = app.guided_template_answer(
+            "What should I verify and submit in a change request, and how do I check CFS status?",
+            context,
+            sources,
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("vouchers, payments, or receipts", result[0])
+        self.assertIn("expand **Summary**", result[0])
+
+    def test_payment_terms_template_preserves_timestamp(self):
+        sources = [
+            {
+                "id": "S1",
+                "path": "Procurement/Updating PO Payment Terms.mp4",
+                "timestamp": "00:00:06.000 --> 00:01:14.000",
+            }
+        ]
+        context = (
+            "[S1] source\nOrders Purchase Orders. Edit PO Information. Open Payment Terms and "
+            "Standard Payment Terms, then Save."
+        )
+        result = app.guided_template_answer("How do I update payment terms?", context, sources)
+        self.assertIsNotNone(result)
+        self.assertIn("00:00:06.000 --> 00:01:14.000", result[0])
+
+    def test_punchout_template_preserves_return_to_cart_and_video_timestamp(self):
+        sources = [
+            {"id": "S1", "path": "Shopping and Requistions/How to Shop.pdf"},
+            {
+                "id": "S2",
+                "path": "Shopping and Requistions/Shop Using a Punchout Catalog.mp4",
+                "timestamp": "00:00:06.000 --> 00:00:53.000",
+            },
+        ]
+        context = (
+            "[S1] source\nFrom the Shopping Home Page use Showcases. Add To Cart, View Cart, enter shipping, "
+            "and select Punchout to return you to your CSUBUY cart.\n\n"
+            "[S2] source\n00:00:06.000 --> 00:00:53.000\nBegin from the shopping home page. "
+            "The page will redirect to the CSU buy shopping cart."
+        )
+        result = app.guided_template_answer(
+            "How do I use a punchout catalog and return the cart to CSUBUY?",
+            context,
+            sources,
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("return the selected items to your CSUBUY cart", result[0])
+        self.assertIn("00:00:06.000 --> 00:00:53.000", result[0])
+        self.assertEqual(result[1][1]["timestamp"], "00:00:06.000 --> 00:00:53.000")
 
 
 class ConditionalRetrievalTests(unittest.TestCase):
