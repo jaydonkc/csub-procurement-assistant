@@ -26,7 +26,7 @@ const API_BASE_URL = (
 ).replace(/\/+$/, '')
 const CHAT_API_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}/v1/chat`
 const CHAT_TIMEOUT_MS = 32_000
-const DEFAULT_SOURCE_PANEL_PERCENT = 38
+const DEFAULT_SOURCE_PANEL_PERCENT = 42
 const MIN_SOURCE_PANEL_WIDTH = 280
 const MIN_CHAT_PANEL_WIDTH = 320
 const SOURCE_PANEL_MAX_PERCENT = 64
@@ -420,6 +420,14 @@ function App() {
     sendMessage()
   }
 
+  function handleSelectSource(source) {
+    setSelectedSource((currentSource) =>
+      currentSource && sourceKey(currentSource) === sourceKey(source)
+        ? null
+        : source,
+    )
+  }
+
   function setSourceWidthFromPixels(requestedWidth) {
     const panel = assistantPanelRef.current
     if (!panel) return
@@ -564,7 +572,7 @@ function App() {
                     <AssistantMessage
                       key={message.id}
                       message={message}
-                      onSelectSource={setSelectedSource}
+                      onSelectSource={handleSelectSource}
                       selectedSourceKey={
                         selectedSource ? sourceKey(selectedSource) : ''
                       }

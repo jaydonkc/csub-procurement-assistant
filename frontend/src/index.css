@@ -96,7 +96,7 @@ button {
 
 .workspace {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
   flex: 1;
@@ -829,7 +829,7 @@ a:focus-visible {
   grid-template-columns:
     minmax(320px, 1fr)
     9px
-    minmax(280px, var(--source-panel-width, 38%));
+    minmax(280px, var(--source-panel-width, 42%));
 }
 
 @media (max-width: 720px) {
