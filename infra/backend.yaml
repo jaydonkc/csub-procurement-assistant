@@ -1,0 +1,713 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Production ingress, protection, and observability for the public CSUB Procurement Assistant.
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: csub-pa-mvp-chat-test
+  FunctionAlias:
+    Type: String
+    Default: production
+  LambdaExecutionRoleName:
+    Type: String
+    Default: AmazonBedrockExecutionRoleForLambda_csub_pa_mvp_chat_test
+  LambdaLogGroupName:
+    Type: String
+    Default: /aws/lambda/csub-pa-mvp-chat-test
+  StageName:
+    Type: String
+    Default: prod
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: Replace with the final frontend origin after frontend integration.
+  WafRateLimit:
+    Type: Number
+    Default: 300
+    MinValue: 100
+    Description: Requests allowed per source IP during a five-minute WAF evaluation window.
+  DeploymentRevision:
+    Type: String
+    Default: initial
+    Description: Change this value to force a new API Gateway deployment.
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional email endpoint for the production alert topic.
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+
+Resources:
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: csub-pa-prod-apigateway-cloudwatch
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  LambdaTracingPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CsubProcurementAssistantXRay
+      Roles:
+        - !Ref LambdaExecutionRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: WriteXRayTelemetry
+            Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+            Resource: "*"
+
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: csub-pa-prod-api
+      Description: Public, no-auth, guidance-only API for the CSUB Procurement Assistant.
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      DisableExecuteApiEndpoint: false
+      MinimumCompressionSize: 1024
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  V1Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: v1
+
+  ChatResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref V1Resource
+      PathPart: chat
+
+  HealthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref V1Resource
+      PathPart: health
+
+  ChatRequestModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref RestApi
+      Name: CsubPaChatRequest
+      ContentType: application/json
+      Description: Version 1 public chat request.
+      Schema:
+        $schema: http://json-schema.org/draft-04/schema#
+        title: CsubPaChatRequest
+        type: object
+        additionalProperties: false
+        required:
+          - message
+          - role
+        properties:
+          message:
+            type: string
+            minLength: 1
+            maxLength: 4000
+          role:
+            type: string
+            enum:
+              - requester
+              - vendor
+              - internal_staff
+          history:
+            type: array
+            maxItems: 6
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - role
+                - text
+              properties:
+                role:
+                  type: string
+                  enum:
+                    - user
+                    - assistant
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+
+  ChatRequestValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      RestApiId: !Ref RestApi
+      Name: validate-chat-body
+      ValidateRequestBody: true
+      ValidateRequestParameters: false
+
+  ChatPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ChatResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      RequestModels:
+        application/json: !Ref ChatRequestModel
+      RequestValidatorId: !Ref ChatRequestValidator
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        TimeoutInMillis: 29000
+        Uri: !Sub
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:${FunctionAlias}
+
+  HealthGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref HealthResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        TimeoutInMillis: 5000
+        Uri: !Sub
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:${FunctionAlias}
+
+  ChatOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ChatResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 204}'
+        IntegrationResponses:
+          - StatusCode: 204
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'content-type'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+              method.response.header.Access-Control-Max-Age: "'300'"
+      MethodResponses:
+        - StatusCode: 204
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  HealthOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref HealthResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 204}'
+        IntegrationResponses:
+          - StatusCode: 204
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'content-type'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+              method.response.header.Access-Control-Max-Age: "'300'"
+      MethodResponses:
+        - StatusCode: 204
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  ApiDefault4xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestApi
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+      ResponseTemplates:
+        application/json: '{"error":"Request rejected by the public API.","request_id":"$context.requestId"}'
+
+  ApiDefault5xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestApi
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+      ResponseTemplates:
+        application/json: '{"error":"The public API could not complete the request.","request_id":"$context.requestId"}'
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/csub-pa-prod
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ChatPostMethod
+      - ChatOptionsMethod
+      - HealthGetMethod
+      - HealthOptionsMethod
+      - ApiDefault4xxResponse
+      - ApiDefault5xxResponse
+    Properties:
+      RestApiId: !Ref RestApi
+      Description: !Sub Production deployment ${DeploymentRevision}
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn:
+      - ApiGatewayAccount
+    Properties:
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: !Ref StageName
+      Description: Production public API stage.
+      TracingEnabled: true
+      AccessLogSetting:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","route":"$context.httpMethod $context.resourcePath","status":"$context.status","responseLength":"$context.responseLength","responseLatency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","integrationStatus":"$context.integrationStatus","errorType":"$context.error.responseType"}'
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          MetricsEnabled: true
+          DataTraceEnabled: false
+          LoggingLevel: ERROR
+          ThrottlingRateLimit: 5
+          ThrottlingBurstLimit: 10
+          CachingEnabled: false
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:${FunctionAlias}
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*
+
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: csub-pa-prod-web-acl
+      Description: Rate and request-size protection for the public procurement assistant API.
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        MetricName: csub-pa-prod-web-acl
+        SampledRequestsEnabled: false
+      Rules:
+        - Name: RejectOversizedBodies
+          Priority: 0
+          Action:
+            Block:
+              CustomResponse:
+                ResponseCode: 413
+                CustomResponseHeaders:
+                  - Name: access-control-allow-origin
+                    Value: !Ref AllowedOrigin
+          Statement:
+            SizeConstraintStatement:
+              ComparisonOperator: GT
+              Size: 64000
+              FieldToMatch:
+                Body:
+                  OversizeHandling: MATCH
+              TextTransformations:
+                - Priority: 0
+                  Type: NONE
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            MetricName: csub-pa-prod-body-size
+            SampledRequestsEnabled: false
+        - Name: RateLimitBySourceIp
+          Priority: 1
+          Action:
+            Block:
+              CustomResponse:
+                ResponseCode: 429
+                CustomResponseHeaders:
+                  - Name: access-control-allow-origin
+                    Value: !Ref AllowedOrigin
+          Statement:
+            RateBasedStatement:
+              AggregateKeyType: IP
+              EvaluationWindowSec: 300
+              Limit: !Ref WafRateLimit
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            MetricName: csub-pa-prod-rate-limit
+            SampledRequestsEnabled: false
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  WebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    DependsOn:
+      - ApiStage
+    Properties:
+      ResourceArn: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${RestApi}/stages/${StageName}
+      WebACLArn: !GetAtt WebAcl.Arn
+
+  WafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: aws-waf-logs-csub-pa-prod
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  WafLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt WebAcl.Arn
+      LogDestinationConfigs:
+        - !GetAtt WafLogGroup.Arn
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Requirement: MEETS_ANY
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+
+  CompletedRequestMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref LambdaLogGroupName
+      FilterName: csub-pa-completed-requests
+      FilterPattern: '{ $.event = "request_complete" }'
+      MetricTransformations:
+        - MetricNamespace: CSUBProcurementAssistant
+          MetricName: CompletedRequests
+          MetricValue: "1"
+
+  FailedRequestMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref LambdaLogGroupName
+      FilterName: csub-pa-failed-requests
+      FilterPattern: '{ $.event = "request_failed" }'
+      MetricTransformations:
+        - MetricNamespace: CSUBProcurementAssistant
+          MetricName: FailedRequests
+          MetricValue: "1"
+
+  GroundingFallbackMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref LambdaLogGroupName
+      FilterName: csub-pa-grounding-fallbacks
+      FilterPattern: '{ $.event = "request_complete" && $.route = "grounding_fallback" }'
+      MetricTransformations:
+        - MetricNamespace: CSUBProcurementAssistant
+          MetricName: GroundingFallbacks
+          MetricValue: "1"
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: csub-pa-prod-alerts
+      DisplayName: CSUB PA production alerts
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Project
+          Value: csub-procurement-assistant
+        - Key: Environment
+          Value: production
+
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-lambda-errors
+      AlarmDescription: The production agent returned an unhandled Lambda error.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FunctionName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  LambdaThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-lambda-throttles
+      AlarmDescription: The production agent was throttled.
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FunctionName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  LambdaDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-lambda-duration-p95
+      AlarmDescription: Production agent p95 duration is close to the 30-second timeout.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FunctionName
+      ExtendedStatistic: p95
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 25000
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  ApiServerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-api-5xx
+      AlarmDescription: The production API returned a server error.
+      Namespace: AWS/ApiGateway
+      MetricName: 5XXError
+      Dimensions:
+        - Name: ApiName
+          Value: csub-pa-prod-api
+        - Name: Stage
+          Value: !Ref StageName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  ApiClientErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-api-4xx-spike
+      AlarmDescription: The production API received an unusual number of rejected requests.
+      Namespace: AWS/ApiGateway
+      MetricName: 4XXError
+      Dimensions:
+        - Name: ApiName
+          Value: csub-pa-prod-api
+        - Name: Stage
+          Value: !Ref StageName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 25
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  ApplicationFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: csub-pa-prod-application-failures
+      AlarmDescription: The agent caught an unexpected backend failure and returned a safe 500 response.
+      Namespace: CSUBProcurementAssistant
+      MetricName: FailedRequests
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  OperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: csub-pa-production
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "region": "${AWS::Region}",
+                "title": "API traffic and errors",
+                "view": "timeSeries",
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  ["AWS/ApiGateway", "Count", "ApiName", "csub-pa-prod-api", "Stage", "${StageName}"],
+                  [".", "4XXError", ".", ".", ".", "."],
+                  [".", "5XXError", ".", ".", ".", "."]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "region": "${AWS::Region}",
+                "title": "Latency",
+                "view": "timeSeries",
+                "stat": "p95",
+                "period": 300,
+                "metrics": [
+                  ["AWS/ApiGateway", "Latency", "ApiName", "csub-pa-prod-api", "Stage", "${StageName}"],
+                  ["AWS/Lambda", "Duration", "FunctionName", "${FunctionName}"]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "region": "${AWS::Region}",
+                "title": "Agent outcomes",
+                "view": "timeSeries",
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  ["CSUBProcurementAssistant", "CompletedRequests"],
+                  [".", "GroundingFallbacks"],
+                  [".", "FailedRequests"]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "region": "${AWS::Region}",
+                "title": "WAF traffic",
+                "view": "timeSeries",
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  ["AWS/WAFV2", "AllowedRequests", "WebACL", "csub-pa-prod-web-acl", "Rule", "ALL", "Region", "${AWS::Region}"],
+                  [".", "BlockedRequests", ".", ".", ".", ".", ".", "."]
+                ]
+              }
+            }
+          ]
+        }
+
+Outputs:
+  ApiId:
+    Value: !Ref RestApi
+  ApiBaseUrl:
+    Value: !Sub https://${RestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}
+  ChatEndpoint:
+    Value: !Sub https://${RestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}/v1/chat
+  HealthEndpoint:
+    Value: !Sub https://${RestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}/v1/health
+  WebAclArn:
+    Value: !GetAtt WebAcl.Arn
+  AlertTopicArn:
+    Value: !Ref AlertTopic
+  DashboardName:
+    Value: !Ref OperationsDashboard
