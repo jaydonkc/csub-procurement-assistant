@@ -1,16 +1,16 @@
 # Agent Production Readiness
 
-Status: the public frontend, backend, and production agent behavior were verified end to end on July 15, 2026. A CSUB-approved custom domain and governance choices remain external decisions.
+Status: the public frontend, backend, and production agent behavior were verified end to end on July 15, 2026. Authenticated requester/vendor status workflows are not implemented. A CSUB-approved custom domain and governance choices remain external decisions.
 
 ## Frozen Runtime
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `10`
+- Version: `14`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Immediate predecessor: `9` (source links without conditional retrieval); version `8` retains conditional retrieval and video playback
+- Immediate predecessor: `13`; versions `10`-`14` retain conditional retrieval, grounded guidance, and expiring source links; version `8` retains the first document/video source-link implementation
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -50,7 +50,7 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 8. Attempt one constrained correction; fail closed if the answer remains unsupported.
 9. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
 
-The agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording only and never authorize restricted content.
+The frozen public agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording only and never authorize restricted content. Any requester/vendor status lookup added to the MVP must use authenticated read-only integration and backend authorization before returning personalized records.
 
 ## Pydantic AI Development Refactor
 
@@ -62,7 +62,7 @@ The development implementation reorganizes the backend without changing the prod
 - Request classification, guided clarification, Knowledge Base retrieval, public-source filtering, source caps, source-verified workflow templates, and S3 URL signing remain deterministic application code.
 - Retrieval is performed before model execution and is not exposed as a model-optional tool.
 
-This refactor is not deployed to the frozen `production` alias. Its local suite passes 83/83 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites must be rerun before publishing or moving an alias.
+This Pydantic path is deployed to the frozen `production` alias. Its local suite passes 83/83 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites should be rerun before any future alias move.
 
 ## Acceptance Results
 
@@ -81,5 +81,5 @@ The raw retrieval evaluation still records exact-source misses for supplier sear
 - Decide whether to replace the working CloudFront domain with a CSUB-approved custom domain and ACM certificate.
 - Supply and confirm an alert recipient for the already-provisioned SNS topic.
 - Approve retention and analytics rules before storing user questions or feedback.
-- Physically separate restricted content or add authentication before enabling any internal workflow.
+- Physically separate restricted content or add authentication and authorization before enabling any personalized requester, vendor, or internal workflow.
 - Assign content-governance ownership before automating the custom-connector synchronization process.

@@ -9,9 +9,8 @@ Production: `https://d3s79ehfkh7xjx.cloudfront.net`
 The default build connects directly to the production API Gateway backend:
 
 - Chat: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod/v1/chat`
-- Health: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod/v1/health`
 
-Copy `.env.example` to `.env.local` to override the backend for another environment. `VITE_API_BASE_URL` is preferred; `VITE_API_URL` and `VITE_HEALTH_URL` can override individual routes.
+Copy `.env.example` to `.env.local` to override the backend for another environment. `VITE_API_BASE_URL` is preferred; `VITE_API_URL` can override the chat route directly.
 
 ## Branding
 

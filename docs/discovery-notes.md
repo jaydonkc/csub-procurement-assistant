@@ -21,7 +21,7 @@ Sources reviewed:
 
 CSUB wants a requester-facing AI assistant that helps faculty and staff navigate CSUBUY/P2P purchasing without needing to know where every policy, guide, approval matrix, vendor step, or training video lives. The strongest customer need is not transaction automation. It is plain-language, source-grounded procedural guidance: "How do I buy this?", "Which path applies?", "What approval is needed?", "How do I process an invoice?", "How do I get a vendor or student worker into the system?", and "Where does my requisition stand?"
 
-The assistant should reduce repeated procurement questions, lower rejected or reworked requisitions, shorten purchase cycle time, and give requesters confidence that they are following the correct CSUB-specific process. The solution should be a guidance layer grounded in campus and CSU-wide procurement materials, not a write-back integration into ServiceNow or CFS for the initial version.
+The assistant should reduce repeated procurement questions, lower rejected or reworked requisitions, shorten purchase cycle time, and give requesters confidence that they are following the correct CSUB-specific process. The solution should be a guidance layer grounded in campus and CSU-wide procurement materials. The initial version can include authenticated read-only status visibility if CSUB provides identity, authorization, and source-system access, but it should not write back into ServiceNow or CFS.
 
 ## Customer And Stakeholder Map
 
@@ -147,7 +147,8 @@ The formal submission asks for requesters to understand where a requisition stan
 
 For MVP, this should be scoped carefully:
 - If live status access is not available, the assistant can explain how to check status in ServiceNow/P2P.
-- If read-only status integration is available later, the assistant could summarize current status and explain likely blockers.
+- If read-only status integration is available for the MVP, authenticated users can see their own requisition status and likely blockers.
+- The assistant should never expose one requester's requisition status to another requester.
 
 ### 7. Procurement workload reduction
 
@@ -213,15 +214,15 @@ Usability:
 Governance:
 - Human owner should approve the source set.
 - Sensitive or outdated materials need a retirement/update process.
-- The assistant should be guidance-only for MVP.
+- The assistant should remain guidance-first for MVP, with any status visibility limited to authenticated read-only access.
 
 Security and access:
-- MVP is a no-auth public guidance assistant.
-- Only documents approved for no-auth exposure should be indexed for MVP.
-- Role selection is self-reported and should shape guidance, not grant access to restricted content.
-- Internal-only, restricted, user-specific, supplier-specific, invoice-specific, and payment-specific data should remain out of scope unless a future authenticated phase is approved.
-- If future requisition status lookup is added, authentication and authorization will be required.
-- For MVP, avoid write-back to ServiceNow or CFS.
+- MVP uses a hybrid access model: public/no-auth guidance plus optional authenticated read-only status lookup.
+- Only documents approved for no-auth exposure should be indexed in the public corpus.
+- Role selection is self-reported for public guidance and should shape language, not grant access to restricted content.
+- Internal-only, restricted, user-specific, supplier-specific, invoice-specific, and payment-specific data must stay out of public retrieval.
+- Authenticated status lookup requires an approved identity provider, backend authorization, audit logging, and read-only source-system access.
+- For MVP, avoid write-back to ServiceNow, P2P, or CFS.
 
 Deployment:
 - Submission form suggests campus AWS environment.
@@ -251,7 +252,8 @@ Data issues to handle:
 Build a retrieval-augmented procurement guidance assistant focused on CSUB requester questions.
 
 MVP scope:
-- Public/no-auth web assistant.
+- Public/no-auth web assistant for general procurement guidance.
+- Authenticated read-only status surface for requester and vendor progress questions if approved identity and source-system integration are available.
 - Static-source chatbot over vetted CSUB and CSU procurement materials.
 - Strong source citations.
 - CSUB-over-CSU source prioritization.
@@ -259,8 +261,9 @@ MVP scope:
 - Video transcript ingestion with timestamp citation where available.
 - Screenshot/reference support for guides or videos where visuals clarify the next step.
 - No write-back to ServiceNow or CFS.
-- No personalized requisition, supplier, invoice, or payment lookup.
-- Requisition status guidance limited to "how to check status" unless a future authenticated read-only integration is explicitly approved.
+- No unauthenticated personalized requisition, supplier, invoice, purchase-order, or payment lookup.
+- No cross-user or cross-vendor status visibility.
+- Authenticated status lookup is read-only and limited to records the user is authorized to view.
 
 MVP user flow:
 1. User asks a procurement question in plain language.
@@ -272,7 +275,6 @@ MVP user flow:
 ## Post-MVP Opportunities
 
 Potential enhancements:
-- Read-only requisition status lookup from ServiceNow/P2P.
 - Contract and supplier search integration.
 - Approved-software lookup integration.
 - Guided intake form that pre-checks purchase method, approvals, supplier status, and technology review.
@@ -290,7 +292,7 @@ Policy/compliance risk:
 - Incorrect procurement guidance can cause rework, delays, off-contract spend, or compliance issues. The system must cite sources and avoid overconfident unsupported answers.
 
 Scope creep risk:
-- "Where does my requisition stand?" can imply live system integration. MVP should distinguish procedural guidance from authenticated transaction status.
+- "Where does my requisition stand?" implies live or near-live system data if the product promises an actual answer. MVP should distinguish public procedural guidance from authenticated read-only transaction status and avoid any write-back behavior.
 
 Data freshness risk:
 - Procurement policies, DOA levels, approved software, and supplier/contract information may change. The solution needs a source update process.
@@ -315,7 +317,7 @@ Policy hierarchy:
 - Are there official source-of-truth documents for DOA, commodity codes, supplier registration, approved software, and technology review?
 
 System integration:
-- Is read-only requisition status lookup required for the camp prototype, or is "how to check status" enough?
+- Which status promises are required for the camp prototype: public "how to check status" guidance, authenticated requester lookup, authenticated vendor/supplier lookup, or all three?
 - Is ServiceNow/P2P API access available?
 - Is CFS access needed or explicitly out of scope?
 - Is supplier/contract data available as documents, spreadsheets, database exports, or live systems?
@@ -324,6 +326,7 @@ Users and access:
 - Who can use the assistant: only CSUB employees, all CSU users, student workers, or public users?
 - Should answers change based on user role or department?
 - Are student worker access rules sensitive or role-dependent?
+- Which identity provider and authorization rules should control requester, vendor, and internal status access?
 
 Success measurement:
 - What is the current baseline for requisition cycle time?
@@ -360,6 +363,7 @@ An AI procurement guide for CSUB requesters that turns CSUBUY/P2P policies, guid
 What it is:
 - A requester-facing guidance assistant.
 - A source-grounded search and explanation layer.
+- An authenticated read-only status surface if CSUB approves identity and source-system access.
 - A way to reduce repetitive procurement questions.
 - A decision-support tool for the correct purchasing path.
 
@@ -367,6 +371,7 @@ What it is not for MVP:
 - A transaction engine.
 - A replacement for Procurement.
 - A write-back integration into ServiceNow or CFS.
+- A public lookup tool for personalized requisition, supplier, invoice, purchase-order, or payment records.
 - A generic CSU chatbot that ignores campus-specific rules.
 
 ## Initial Build Plan
@@ -397,6 +402,7 @@ What it is not for MVP:
    - Student worker access.
    - Invoice processing.
    - New vendor onboarding.
+   - Authenticated read-only requisition/vendor status lookup if approved source-system access is available.
    - Purchase method selection.
    - DOA approval guidance.
    - Technology/software purchase review.
@@ -417,9 +423,10 @@ What it is not for MVP:
 - Can you provide the CSUB-specific document repository and confirm which files are authoritative?
 - Can you provide YouTube links or raw files for the P2P training videos?
 - Who should approve source priority when CSUB and CSU-wide documents overlap?
-- Is the prototype expected to answer requisition status questions using live data, or only explain how users can check status?
+- Which authenticated status lookup, if any, should the prototype support for requesters and vendors?
 - Can we get examples of the top 20 repeated "how do I buy this" questions Procurement receives?
 - Can we get sample rejected/reworked requisition scenarios to test whether the assistant prevents common mistakes?
 - Is there a current approved-software list and technology review checklist we can ingest?
 - Are supplier registration and contract lookup available as static exports for MVP?
+- What identity provider and authorization rules should protect personalized requester/vendor status?
 - What AWS environment constraints or services should the team assume?

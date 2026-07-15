@@ -1,6 +1,6 @@
 # AWS Architecture: MVP Baseline
 
-Status: AWS content, retrieval, production agent behavior, public API protection, operations plumbing, and the public frontend are provisioned and verified as of July 15, 2026. A CSUB-approved custom domain remains optional launch work.
+Status: AWS content, retrieval, production agent behavior, public API protection, operations plumbing, and the public frontend are provisioned and verified as of July 15, 2026. Authenticated read-only status lookup remains a product direction that requires a CSUB-approved identity model and source-system integration; it is not implemented in the frozen public agent. A CSUB-approved custom domain remains optional launch work.
 
 ## Scope
 
@@ -8,9 +8,9 @@ Status: AWS content, retrieval, production agent behavior, public API protection
 - Region: `us-west-2`
 - AWS CLI profile: `summercamp`
 - Access model: AWS IAM Identity Center / SSO session; no raw or long-lived access keys
-- Product direction: public, no-auth procurement guidance
+- Product direction: public procurement guidance plus optional authenticated read-only requester/vendor status lookup
 
-Public/no-auth describes the current user experience. It does not make the S3 bucket or Bedrock resources public. The current Knowledge Base contains mixed-scope material, including internal/admin guidance, so the Lambda agent enforces metadata, path, intent, and response-level controls before returning public guidance.
+Public/no-auth describes the current guidance user experience. It does not make the S3 bucket or Bedrock resources public. The current Knowledge Base contains mixed-scope material, including internal/admin guidance, so the Lambda agent enforces metadata, path, intent, and response-level controls before returning public guidance. Any authenticated status lookup should be a separate read-only integration path with explicit identity, authorization, and audit controls.
 
 ## Live Resources
 
@@ -62,11 +62,11 @@ The previous default-chunked Knowledge Base `KZWZQVCCJW` and data source `UEPVWR
 ### Agent runtime
 
 - Lambda function: `csub-pa-mvp-chat-test`
-- Production alias: `production` -> immutable version `10`
+- Production alias: `production` -> immutable version `14`
 - Production API: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - API routes: `POST /v1/chat` and `GET /v1/health`
 - Legacy Lambda URLs: retained with `AuthType=AWS_IAM`; no anonymous bypass
-- Immediate predecessors: version `9` retains document/video source links without conditional retrieval; version `8` retains conditional retrieval and video playback
+- Rollback versions: version `13` is the immediate predecessor; versions `10`-`14` retain conditional retrieval, grounded guidance, and expiring source links; version `8` retains the first document/video source-link implementation
 - Runtime: Python 3.13 on ARM64, 256 MB memory, 30-second timeout
 - Generation model: US Anthropic Claude Sonnet 4.6 inference profile
 - Retrieval router and grounding validator: US Anthropic Claude Haiku 4.5 inference profile
@@ -78,9 +78,9 @@ The previous default-chunked Knowledge Base `KZWZQVCCJW` and data source `UEPVWR
 
 The function supports a versioned JSON chat contract and health endpoint. It retrieves up to 12 candidates, keeps at most two chunks from any source, and passes at most eight excerpts into generation. Managed reranking is disabled because it is unavailable with a custom embedding model. Returned public document and video sources can include private presigned links that expire after 15 minutes; videos retain the retrieved transcript timestamp.
 
-The development backend keeps `backend/lambda_function.py` as a thin AWS adapter and uses pinned Pydantic AI `2.10.0` for Bedrock model orchestration. Pydantic AI supplies typed Haiku routing, Sonnet answer generation, a structured Haiku grounding audit, and one constrained validation retry. Deterministic access gates, managed Knowledge Base retrieval, metadata/path filtering, guided templates, source caps, and source-link signing remain application code. This refactor has not been deployed to the immutable `production` alias; version `2` remains the live baseline until the full acceptance suite passes against a newly published version.
+The backend keeps `backend/lambda_function.py` as a thin AWS adapter and uses pinned Pydantic AI `2.10.0` for Bedrock model orchestration. Pydantic AI supplies typed Haiku routing, Sonnet answer generation, a structured Haiku grounding audit, and one constrained validation retry. Deterministic access gates, managed Knowledge Base retrieval, metadata/path filtering, guided templates, source caps, and source-link signing remain application code. This Pydantic path is deployed behind the immutable `production` alias at version `14`.
 
-Requests first pass through deterministic gates that block submit/approve/edit actions, personalized live lookups, PII-access requests, internal/admin procedures, and prompt-injection attempts. If a gate does not decide the turn, Haiku returns a structured `conversation`, `clarification`, `out_of_scope`, or `retrieve` decision. Only `retrieve` calls the Knowledge Base; contextual follow-ups can be rewritten into standalone search queries. Non-retrieval replies are bounded to prevent unsupported facts, and malformed, unavailable, or uncertain router output defaults to retrieval. Ambiguous software and purchase requests still receive guided intake questions. High-frequency workflows use source-verified response templates; remaining answers use Sonnet generation, sentence/line citation checks, Haiku entailment validation, and one constrained repair attempt before failing closed.
+Requests first pass through deterministic gates that block submit/approve/edit actions, unauthenticated personalized live lookups, PII-access requests, internal/admin procedures, and prompt-injection attempts. If a gate does not decide the turn, Haiku returns a structured `conversation`, `clarification`, `out_of_scope`, or `retrieve` decision. Only `retrieve` calls the Knowledge Base; contextual follow-ups can be rewritten into standalone search queries. Non-retrieval replies are bounded to prevent unsupported facts, and malformed, unavailable, or uncertain router output defaults to retrieval. Ambiguous software and purchase requests still receive guided intake questions. High-frequency workflows use source-verified response templates; remaining answers use Sonnet generation, sentence/line citation checks, Haiku entailment validation, and one constrained repair attempt before failing closed.
 
 The execution role can call `bedrock:Retrieve` on `3MMHDI5IDU`, invoke the production Sonnet and Haiku inference profiles, invoke Nova Lite for the oldest rollback version, write this function's CloudWatch logs, and publish X-Ray telemetry. For cited-source links it has `s3:GetObject` on `approved/documents/*` and an exact allowlist of 11 public training-video objects; it has no bucket-list permission, no access to the DXHub instruction bucket, and no procurement-system write permissions. The application signs only sources that already passed the public metadata and path filters.
 
@@ -129,14 +129,14 @@ Last verified July 15, 2026:
 - A 12-scenario guided retrieval comparison covered supplier onboarding, invitations, receiving, requisition search, default addresses, change requests, support tickets, payment terms, punchout shopping, fiscal year end, voucher status, and supplier status.
 - The replacement returned an expected source in 12/12 scenarios versus 11/12, improved mean expected-source rank from 2.33 to 1.25, improved procedural-term coverage from 88.9% to 94.5%, reduced duplicate context chunks from 54 to 31, and returned useful timestamps in 5/5 video-oriented scenarios versus 2/5.
 - Both configurations returned zero `access_scope=internal` sources under the public-test filter.
-- API health identifies immutable Lambda version `10`; both direct Lambda URLs reject anonymous requests with `403`.
+- API health identifies immutable Lambda version `14`; both direct Lambda URLs reject anonymous requests with `403`.
 - The CloudFront distribution reports `Deployed`, the public page returns `200`, and the S3 policy status reports `IsPublic: false` with all four public-access blocks enabled.
 - The deployed page returns the configured CSP, HSTS, frame, content-type, referrer, and permissions headers; versioned assets return the one-year immutable cache policy while `index.html` returns `no-cache,no-store,must-revalidate`.
 - Browser preflight from the CloudFront origin returns `204`, and a post-deployment guided voucher-status request returned a cited public source through the production API.
 - The final 36-scenario raw-retrieval suite returned 34/36 exact expected-source hits, 93.1% mean procedural-term coverage, 0 internal-source leaks, 3/3 timestamp passes, and 1.783-second p95 retrieval latency.
 - The final 13-scenario guided end-to-end suite through API Gateway and WAF returned 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal-source leaks, 0 duplicate source cards, 3/3 timestamp passes, and 9.215-second p95 latency.
 - All 8 boundary cases passed: PII refusal, live lookup, submit action, approve action, prompt injection, unrelated topic, ambiguous software clarification, and self-reported internal-role access.
-- Post-version-10 conditional-routing checks passed nine live cases: four conversational/clarification/out-of-scope turns returned no sources, substantive procurement and contextual follow-up turns retrieved, and a direct transaction action remained blocked before retrieval.
+- Conditional-routing checks passed nine live cases: four conversational/clarification/out-of-scope turns returned no sources, substantive procurement and contextual follow-up turns retrieved, and a direct transaction action remained blocked before retrieval.
 - A deployed-browser `hi` check returned the natural greeting with no source section. Cited PDF and MP4 URLs both returned HTTP `206` with `application/pdf` and `video/mp4`, respectively.
 - The raw retrieval exceptions remain visible for evaluation: supplier-search and Marketplace end-user exact-source misses, plus partial heuristic term coverage for the forms scenario. Guided end-to-end behavior passed because routing and source-verified workflows are evaluated as the product surface.
 
@@ -153,8 +153,9 @@ Some documents may report `TEXT_INDEXED` while optional image extraction continu
 - Synchronize only objects under `approved/` through the custom connector.
 - Keep raw videos under `media/videos/`, outside the indexed prefixes.
 - Convert videos into timestamped VTT transcripts before placing them under `approved/transcripts/`.
-- Treat requester, vendor, and internal-staff roles as guidance context, not authorization.
-- Do not add personalized supplier, invoice, payment, requester, or transaction records to this Knowledge Base.
+- Treat requester, vendor, and internal-staff role buttons as guidance context, not authorization.
+- Do not add personalized supplier, invoice, payment, requester, or transaction records to the public Knowledge Base.
+- Serve personalized status only through an authenticated read-only integration or restricted corpus that enforces least-privilege authorization before retrieval or response generation.
 
 ## Source Synchronization
 
@@ -176,7 +177,7 @@ The owner of this approval and synchronization process is still an open governan
 - Optional CSUB-approved custom domain and ACM certificate for CloudFront
 - Alert topic recipient confirmation
 - Production analytics and feedback storage
-- Authentication for any future restricted or personalized workflows
+- Authentication, authorization, and audit logging for requester/vendor status workflows
 - Physical separation of internal content into a restricted Knowledge Base
 - Automated video transcription and ingestion pipeline; the current 17-video batch was operator-run
 - Scheduled or event-driven Knowledge Base synchronization
