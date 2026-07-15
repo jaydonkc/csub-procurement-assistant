@@ -62,7 +62,7 @@ The development implementation reorganizes the backend without changing the prod
 - Request classification, guided clarification, Knowledge Base retrieval, public-source filtering, source caps, source-verified workflow templates, and S3 URL signing remain deterministic application code.
 - Retrieval is performed before model execution and is not exposed as a model-optional tool.
 
-This refactor is not deployed to the frozen `production` alias. Its local suite passes 70/70 focused tests, including valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites must be rerun before publishing or moving an alias.
+This refactor is not deployed to the frozen `production` alias. Its local suite passes 83/83 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites must be rerun before publishing or moving an alias.
 
 ## Acceptance Results
 
