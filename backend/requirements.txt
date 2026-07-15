@@ -2,3 +2,4 @@ flask
 flask-cors
 python-dotenv
 boto3>=1.43.48,<2
+pydantic-ai-slim[bedrock]==2.10.0
