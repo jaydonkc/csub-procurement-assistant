@@ -73,6 +73,7 @@ Resources:
               form-action 'self';
               frame-ancestors 'none';
               img-src 'self' data:;
+              media-src 'self' https://csub-pa-mvp-source-335010339891-us-west-2.s3.amazonaws.com;
               object-src 'none';
               script-src 'self';
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;

@@ -7,4 +7,5 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 python-dotenv==1.2.2
+pydantic-ai-slim[bedrock]==2.10.0
 Werkzeug==3.1.8

@@ -13,6 +13,10 @@ The default build connects directly to the production API Gateway backend:
 
 Copy `.env.example` to `.env.local` to override the backend for another environment. `VITE_API_BASE_URL` is preferred; `VITE_API_URL` and `VITE_HEALTH_URL` can override individual routes.
 
+## Branding
+
+The header uses the official CSUB Bakersfield logo asset with padded desktop and mobile spacing. It does not show demo or backend-status badges.
+
 ## Run locally
 
 ```bash
