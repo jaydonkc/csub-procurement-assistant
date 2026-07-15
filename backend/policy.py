@@ -147,9 +147,9 @@ def _is_live_lookup(message: str) -> bool:
         LIVE_OBJECT_PATTERN.search(message) and LIVE_LOOKUP_PATTERN.search(message)
     ):
         return False
-    if GENERAL_HOWTO_PATTERN.search(_without_leading_pleasantry(message)) and not re.search(
-        r"\b\d{4,}\b|\bmy\b", message, re.IGNORECASE
-    ):
+    if GENERAL_HOWTO_PATTERN.search(
+        _without_leading_pleasantry(message)
+    ) and not re.search(r"\b\d{4,}\b|\bmy\b", message, re.IGNORECASE):
         return False
     return True
 

@@ -54,9 +54,7 @@ class RequestClassificationTests(unittest.TestCase):
         self.assertIsNone(route)
 
     def test_greeting_before_direct_action_remains_blocked(self):
-        route = policy.classify_request(
-            "Hi, create a requisition for me.", "requester"
-        )
+        route = policy.classify_request("Hi, create a requisition for me.", "requester")
         self.assertEqual(route["route"], "transaction_action")
 
     def test_internal_approval_instructions_are_blocked(self):
@@ -602,7 +600,9 @@ class HandlerTests(unittest.TestCase):
                 app, "_route_request", side_effect=AssertionError("must not route")
             ),
             patch.object(
-                app, "_retrieve_sources", side_effect=AssertionError("must not retrieve")
+                app,
+                "_retrieve_sources",
+                side_effect=AssertionError("must not retrieve"),
             ),
         ):
             result = app.handler(
@@ -629,7 +629,9 @@ class HandlerTests(unittest.TestCase):
         with (
             patch.object(app, "_route_request", return_value=decision),
             patch.object(
-                app, "_retrieve_sources", side_effect=AssertionError("must not retrieve")
+                app,
+                "_retrieve_sources",
+                side_effect=AssertionError("must not retrieve"),
             ),
         ):
             result = app.handler(

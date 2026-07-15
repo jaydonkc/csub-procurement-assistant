@@ -44,7 +44,9 @@ def safe_router_reply(route: str, reply: str) -> str:
         r"\b(?:click|navigate|select|submit|approve|required|must|deadline|within \d+)\b",
         r"\b(?:track|look up|access|change)\s+(?:your\s+)?(?:purchase|requisition|invoice|voucher|payment|supplier|record)s?\b",
     )
-    if any(re.search(pattern, normalized, re.IGNORECASE) for pattern in unsafe_patterns):
+    if any(
+        re.search(pattern, normalized, re.IGNORECASE) for pattern in unsafe_patterns
+    ):
         return fallback
     return normalized
 

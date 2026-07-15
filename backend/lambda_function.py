@@ -1,8 +1,8 @@
 """AWS Lambda adapter for the public CSUB Procurement Assistant.
 
-The model loop is implemented with Pydantic AI. Public-access policy,
-retrieval, source filtering, and workflow routing remain deterministic and run
-before model generation.
+Deterministic policy gates run before Pydantic AI's typed retrieval router.
+Knowledge Base access, public-source filtering, and verified workflows remain
+application-controlled; Pydantic AI also owns grounded answer generation.
 """
 
 from __future__ import annotations
@@ -157,7 +157,11 @@ def _route_request(
         )
     except Exception:
         return retrieval_fallback(message)
-    return decision if isinstance(decision, RetrievalDecision) else retrieval_fallback(message)
+    return (
+        decision
+        if isinstance(decision, RetrievalDecision)
+        else retrieval_fallback(message)
+    )
 
 
 def _sources_with_urls(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -263,9 +267,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 _chat_payload(retrieval_decision.reply, [], request_id),
             )
 
-        source_context, sources = _retrieve_sources(
-            retrieval_decision.search_query
-        )
+        source_context, sources = _retrieve_sources(retrieval_decision.search_query)
         if not sources:
             answer = (
                 "I could not find an approved public source that supports a reliable answer, so I will not guess. "
