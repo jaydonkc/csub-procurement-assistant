@@ -944,6 +944,13 @@ button {
   font-size: 0.78rem;
 }
 
+.caption-status {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
 .segment-callout {
   margin-top: 12px;
   padding: 10px 12px;
