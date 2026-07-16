@@ -413,6 +413,34 @@ button {
   font-weight: 650;
 }
 
+.answer-timestamp {
+  margin: 0 1px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--csub-blue);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.answer-timestamp:hover {
+  color: var(--csub-navy);
+  background: var(--soft-blue);
+}
+
+.answer-timestamp svg {
+  flex: 0 0 auto;
+}
+
 .source-list {
   margin-top: 15px;
   padding-top: 11px;

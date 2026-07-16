@@ -34,6 +34,9 @@ const MIN_SOURCE_PANEL_WIDTH = 280
 const MIN_CHAT_PANEL_WIDTH = 320
 const SOURCE_PANEL_MAX_PERCENT = 64
 const RESIZER_WIDTH = 9
+const VIDEO_TIMESTAMP_LINK_PREFIX = '#video-timestamp-source-'
+const VIDEO_TIMESTAMP_PATTERN =
+  /\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\s*-->\s*\d{2}:\d{2}:\d{2}(?:\.\d+)?\b/g
 
 const roles = [
   { id: 'requester', label: 'Faculty or Staff', Icon: UserRound },
@@ -172,6 +175,74 @@ function formatTimestampRange(timestamp) {
   const start = formatPlaybackTime(range.start)
   const end = range.end === null ? '' : ` --> ${formatPlaybackTime(range.end)}`
   return `${start}${end}`
+}
+
+function timestampRangesMatch(firstTimestamp, secondTimestamp) {
+  const first = parseTimestampRange(firstTimestamp)
+  const second = parseTimestampRange(secondTimestamp)
+  if (first.start === null || second.start === null) return false
+
+  const startsMatch = Math.abs(first.start - second.start) < 0.001
+  const endsMatch =
+    first.end === null
+      ? second.end === null
+      : second.end !== null && Math.abs(first.end - second.end) < 0.001
+  return startsMatch && endsMatch
+}
+
+function linkVideoTimestamps({ sources = [] } = {}) {
+  return (tree) => {
+    function transformNode(node) {
+      if (
+        !Array.isArray(node.children) ||
+        ['code', 'inlineCode', 'link', 'linkReference'].includes(node.type)
+      ) {
+        return
+      }
+
+      node.children = node.children.flatMap((child) => {
+        if (child.type !== 'text') {
+          transformNode(child)
+          return [child]
+        }
+
+        const matches = [...child.value.matchAll(VIDEO_TIMESTAMP_PATTERN)]
+        if (!matches.length) return [child]
+
+        const replacements = []
+        let offset = 0
+        matches.forEach((match) => {
+          const index = match.index ?? 0
+          if (index > offset) {
+            replacements.push({ type: 'text', value: child.value.slice(offset, index) })
+          }
+
+          const sourceIndex = sources.findIndex(
+            (source) =>
+              isVideoSource(source) &&
+              timestampRangesMatch(source.timestamp, match[0]),
+          )
+          replacements.push(
+            sourceIndex === -1
+              ? { type: 'text', value: match[0] }
+              : {
+                  type: 'link',
+                  url: `${VIDEO_TIMESTAMP_LINK_PREFIX}${sourceIndex}`,
+                  children: [{ type: 'text', value: match[0] }],
+                },
+          )
+          offset = index + match[0].length
+        })
+
+        if (offset < child.value.length) {
+          replacements.push({ type: 'text', value: child.value.slice(offset) })
+        }
+        return replacements
+      })
+    }
+
+    transformNode(tree)
+  }
 }
 
 function playbackUrl(source, range) {
@@ -535,6 +606,33 @@ function AssistantMessage({
   selectedSourceKey,
   selectedStatusKey,
 }) {
+  function renderMarkdownLink({ href, children, title }) {
+    if (href?.startsWith(VIDEO_TIMESTAMP_LINK_PREFIX)) {
+      const sourceIndex = Number(href.slice(VIDEO_TIMESTAMP_LINK_PREFIX.length))
+      const source = message.sources?.[sourceIndex]
+      if (source) {
+        return (
+          <button
+            className="answer-timestamp"
+            type="button"
+            title={`Open ${sourceName(source.path)} at ${formatTimestampRange(source.timestamp)}`}
+            aria-label={`Play ${sourceName(source.path)} at ${formatTimestampRange(source.timestamp)}`}
+            onClick={() => onSelectSource(source, { seekToTimestamp: true })}
+          >
+            <CirclePlay size={14} aria-hidden="true" />
+            <span>{children}</span>
+          </button>
+        )
+      }
+    }
+
+    return (
+      <a href={href} title={title}>
+        {children}
+      </a>
+    )
+  }
+
   return (
     <article className="message assistant-message">
       <div className="assistant-mark" aria-hidden="true">
@@ -543,7 +641,12 @@ function AssistantMessage({
       <div className="message-content">
         <div className="message-label">CSUB Procurement Assistant</div>
         <div className="markdown">
-          <ReactMarkdown>{message.text}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[[linkVideoTimestamps, { sources: message.sources }]]}
+            components={{ a: renderMarkdownLink }}
+          >
+            {message.text}
+          </ReactMarkdown>
         </div>
         <StatusResult
           status={message.statusCard}
@@ -708,12 +811,14 @@ function App() {
     setRole(nextRole)
   }
 
-  function handleSelectSource(source) {
+  function handleSelectSource(source, { seekToTimestamp = false } = {}) {
     setRoleSessionField(role, 'selectedStatus', null)
     setRoleSessionField(role, 'selectedSource', (currentSource) =>
-      currentSource && sourceKey(currentSource) === sourceKey(source)
-        ? null
-        : source,
+      seekToTimestamp
+        ? { ...source, playbackRequestId: crypto.randomUUID() }
+        : currentSource && sourceKey(currentSource) === sourceKey(source)
+          ? null
+          : source,
     )
   }
 
@@ -1009,7 +1114,7 @@ function App() {
                 />
               ) : (
                 <SourcePanel
-                  key={`${sourceKey(selectedSource)}-${selectedSource.caption_url || ''}`}
+                  key={`${sourceKey(selectedSource)}-${selectedSource.caption_url || ''}-${selectedSource.playbackRequestId || ''}`}
                   source={selectedSource}
                   onClose={() =>
                     setRoleSessionField(role, 'selectedSource', null)
