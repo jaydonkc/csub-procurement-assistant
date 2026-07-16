@@ -48,6 +48,38 @@ DOCUMENT_CONTENT_TYPES = {
     ".xls": "application/vnd.ms-excel",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
+DEMO_ID_PATTERN = re.compile(r"\bDEMO-[A-Z]{2,5}-\d{4}\b", re.IGNORECASE)
+DEMO_MUTATION_PATTERN = re.compile(
+    r"\b(?:approve|submit|edit|modify|change|cancel|delete|withdraw|reject|finalize|pay|process)\b",
+    re.IGNORECASE,
+)
+DEMO_EXAMPLE_IDS = ("DEMO-REQ-1001", "DEMO-PO-2001", "DEMO-INV-3001", "DEMO-VCH-4002")
+DEMO_TRANSACTIONS: dict[str, dict[str, Any]] = {
+    "DEMO-REQ-1001": {
+        "type": "Requisition",
+        "summary": "Laptop and docking station for a new faculty workspace",
+        "status": "Pending department approval",
+        "next_step": "The department approver reviews the requisition before it can continue to Procurement.",
+    },
+    "DEMO-PO-2001": {
+        "type": "Purchase order",
+        "summary": "Instructional laboratory supplies",
+        "status": "Purchase order issued",
+        "next_step": "The supplier fulfills the order; after delivery, the requester records receipt when required.",
+    },
+    "DEMO-INV-3001": {
+        "type": "Invoice",
+        "summary": "Invoice associated with a completed equipment delivery",
+        "status": "In process",
+        "next_step": "Accounts Payable completes its review before the payment can be scheduled.",
+    },
+    "DEMO-VCH-4002": {
+        "type": "Voucher",
+        "summary": "Completed payment example",
+        "status": "Marked as paid",
+        "next_step": "No action is required in this demonstration record.",
+    },
+}
 
 _agent_runtime = None
 _bedrock_runtime = None
@@ -165,6 +197,7 @@ PROCUREMENT_TERMS = (
 
 PROMPT_ATTACK_PATTERNS = (
     r"\bignore (?:all |any )?(?:previous|prior|system) instructions?\b",
+    r"\bignore (?:all |any )?(?:rules|instructions)\b",
     r"\b(?:reveal|show|print|repeat|leak) (?:the )?(?:system prompt|hidden prompt|internal documents?|restricted documents?)\b",
     r"\b(?:bypass|disable|override) (?:the )?(?:guardrails?|filters?|access controls?)\b",
     r"\bpretend (?:that )?(?:you|i) (?:am|are) (?:authorized|an? admin)",
@@ -279,7 +312,8 @@ FIXED_RESPONSES = {
     ),
     "live_lookup": (
         "I do not have live access to CSUBUY, ServiceNow, CFS, supplier, invoice, voucher, purchase-order, or payment records, so I cannot verify the current status of that item. "
-        "I can provide public, source-backed instructions for where you can check it yourself, or you can contact the responsible CSUB support office."
+        "I can provide public, source-backed instructions for where you can check it yourself, or you can contact the responsible CSUB support office. "
+        "To preview status tracking with synthetic data, try DEMO-REQ-1001, DEMO-PO-2001, or DEMO-INV-3001."
     ),
 }
 
@@ -383,6 +417,33 @@ def sanitize_history(raw_history: Any) -> list[dict[str, str]]:
     return cleaned
 
 
+def demo_ids_in_message(message: str) -> list[str]:
+    """Return unique normalized demo identifiers in message order."""
+    return list(dict.fromkeys(match.group(0).upper() for match in DEMO_ID_PATTERN.finditer(message)))
+
+
+def demo_transaction_response(message: str) -> str | None:
+    """Resolve an explicit synthetic identifier without model or Knowledge Base access."""
+    demo_ids = demo_ids_in_message(message)
+    if not demo_ids:
+        return None
+    if len(demo_ids) > 1:
+        return "I found more than one synthetic identifier. Enter one DEMO-* identifier at a time so I can show a single demonstration status."
+    demo_id = demo_ids[0]
+    record = DEMO_TRANSACTIONS.get(demo_id)
+    if not record:
+        examples = ", ".join(f"`{value}`" for value in DEMO_EXAMPLE_IDS)
+        return (
+            f"`{demo_id}` is not in the synthetic demonstration data. Try {examples}. "
+            "These examples are not connected to any live procurement system."
+        )
+    return (
+        "**Synthetic demonstration data — not a live CSUBUY record.**\n\n"
+        f"`{demo_id}` ({record['type']}) is **{record['status']}**. "
+        f"Example purchase: {record['summary']}. Next step: {record['next_step']}"
+    )
+
+
 def _contains_pattern(text: str, patterns: tuple[str, ...]) -> bool:
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
@@ -445,9 +506,9 @@ def classify_request(message: str, role: str) -> dict[str, str] | None:
         return {"route": "sensitive_access", "answer": FIXED_RESPONSES["sensitive_access"]}
     if _contains_pattern(message, PROMPT_ATTACK_PATTERNS):
         return {"route": "prompt_attack", "answer": FIXED_RESPONSES["prompt_attack"]}
-    if _is_action_request(message):
+    if _is_action_request(message) or (demo_ids_in_message(message) and DEMO_MUTATION_PATTERN.search(message)):
         return {"route": "transaction_action", "answer": FIXED_RESPONSES["transaction_action"]}
-    if _is_live_lookup(message):
+    if _is_live_lookup(message) and not demo_ids_in_message(message):
         return {"route": "live_lookup", "answer": FIXED_RESPONSES["live_lookup"]}
     if _contains_pattern(message, INTERNAL_PROCEDURE_PATTERNS):
         return {"route": "internal_procedure", "answer": FIXED_RESPONSES["internal_procedure"]}
@@ -1413,6 +1474,17 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if route:
             _log("request_complete", request_id, route=route["route"], source_count=0, grounding="not_applicable")
             return response(200, {"answer": route["answer"], "sources": [], "request_id": request_id})
+
+        demo_result = demo_transaction_response(message)
+        if demo_result:
+            _log(
+                "request_complete",
+                request_id,
+                route="demo_transaction",
+                source_count=0,
+                grounding="synthetic_demo",
+            )
+            return response(200, {"answer": demo_result, "sources": [], "request_id": request_id})
 
         retrieval_decision = decide_retrieval(message, role, history)
         if retrieval_decision["route"] != "retrieve":

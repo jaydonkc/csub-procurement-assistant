@@ -7,7 +7,7 @@ Status: live and verified July 15, 2026.
 Base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 
 - `GET /v1/health` returns the service status, immutable Lambda version, and request ID without calling Bedrock.
-- `POST /v1/chat` accepts a bounded public guidance request and returns an answer, cited public source cards, and request ID.
+- `POST /v1/chat` accepts a bounded public guidance request and returns an answer, optional cited public source cards, structured synthetic demo status when applicable, and a request ID.
 - `OPTIONS` is enabled for both routes. The current public MVP allows all browser origins; replace `AllowedOrigin=*` with the approved frontend origin during frontend integration.
 
 ## Chat Request
@@ -43,6 +43,18 @@ The API requires `message` and `role`. The message is limited to 4,000 character
 
 Conversation, clarification, out-of-scope, safety, and capability routes can return a successful response with an empty `sources` array. The pre-retrieval router is used only after deterministic gates; it defaults to retrieval when its output is invalid, unavailable, or uncertain. Substantive procurement answers still require grounded citations.
 
+An exact synthetic identifier such as `DEMO-REQ-1001` uses a deterministic, read-only path before the router and retrieval. It uses the normal chat response shape:
+
+```json
+{
+  "answer": "Synthetic demonstration data — not a live CSUBUY record. DEMO-REQ-1001 is Pending department approval.",
+  "sources": [],
+  "request_id": "example-request-id"
+}
+```
+
+Known examples include `DEMO-REQ-1001`, `DEMO-PO-2001`, `DEMO-INV-3001`, and `DEMO-VCH-4002`. Unknown `DEMO-*` identifiers fail closed with no record, sources, retrieval, or model generation. Requests to change even a synthetic transaction are blocked by the same capability gates as live transactions. Any non-demo order, invoice, voucher, or requisition lookup remains unsupported.
+
 Public cited documents can include `source_url`; cited training videos can include both `source_url` and `media_url` plus a transcript `timestamp`. These are private S3 presigned links with `media_expires_in=900`, not permanent public URLs. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
 
 ## Production Controls
@@ -53,9 +65,10 @@ Public cited documents can include `source_url`; cited training videos can inclu
 - Access logs exclude request bodies, chat content, source IPs, and user agents.
 - Lambda application logs contain request IDs, route outcomes, grounding status, and source counts—not questions or answers.
 - No chat, question, or feedback database exists until CSUB approves a retention policy.
+- Synthetic records are a four-record Python dictionary with no names, email addresses, financial account data, or connection to CSUB systems.
 
 ## Deployment
 
-`infra/backend.yaml` defines the production API, WAF, logging, metrics, alarms, alert topic, dashboard, API invocation permission, and X-Ray permission. `scripts/deploy_backend.sh` verifies account `335010339891`, reconciles the bounded source-link policies, vendors the pinned Lambda SDK, runs the policy/API tests, updates the stack, verifies both grounded and no-retrieval `$LATEST` responses, publishes an immutable version, moves the alias, and rolls back if post-alias health, grounded-answer, or conditional-retrieval checks fail. Code hashes and revision IDs prevent a concurrent deployment from silently replacing the tested code.
+`infra/backend.yaml` defines the production API, WAF, logging, metrics, alarms, alert topic, dashboard, API invocation permission, and X-Ray permission. `scripts/deploy_backend.sh` verifies account `335010339891`, reconciles the bounded source-link policies, vendors the pinned Lambda SDK, runs the policy/API tests, updates the stack, verifies grounded and no-retrieval `$LATEST` responses, publishes an immutable version, moves the alias, and rolls back if post-alias health or behavior checks fail. Code hashes and revision IDs prevent a concurrent deployment from silently replacing the tested code.
 
 The deployment script defaults to AWS profile `summercamp` and region `us-west-2`. Optional environment variables include `ALLOWED_ORIGIN`, `WAF_RATE_LIMIT`, and `ALERT_EMAIL`. Supplying `ALERT_EMAIL` creates an email subscription that still requires recipient confirmation.

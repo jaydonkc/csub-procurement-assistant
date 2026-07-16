@@ -6,11 +6,11 @@ Status: ready for the defined public, no-auth, guidance-only MVP scope. The fron
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `14`
+- Version: `17`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Immediate rollback predecessor: `13`
+- Immediate rollback predecessor: `16`
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -42,27 +42,28 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 
 1. Validate and bound the request body, role, message, and recent history.
 2. Apply deterministic capability, access, prompt-injection, and PII gates.
-3. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
-4. Return bounded natural language with no sources for non-retrieval turns.
-5. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
-6. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
-7. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
-8. Attempt one constrained correction; fail closed if the answer remains unsupported.
-9. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
+3. Resolve an exact `DEMO-*` identifier from the in-code Python dictionary; do not call the router, Knowledge Base, or generation model for this path.
+4. Route every other allowed turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
+5. Return bounded natural language with no sources for non-retrieval turns.
+6. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
+7. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
+8. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
+9. Attempt one constrained correction; fail closed if the answer remains unsupported.
+10. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
 
-The agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording only and never authorize restricted content.
+The agent cannot submit, approve, edit, withdraw, reject, or look up live transactions. It can return read-only records only from the four-entry synthetic Python dictionary for exact `DEMO-*` identifiers. Self-reported roles affect wording only and never authorize restricted content.
 
 ## Acceptance Results
 
 Final post-deployment run through API Gateway and WAF:
 
-- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.569-second p95.
-- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 4.749-second p95.
+- Raw retrieval: 34/36 exact expected-source hits, 93.1% mean term coverage, 0 internal leaks, 3/3 timestamp checks, 1.837-second p95.
+- Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 5.162-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
-- Role and behavior acceptance: 13/13 passed, including greetings and thanks without sources, mixed greeting/procedure retrieval, generic vendor guidance, personalized lookup and direct-action refusal, vendor registration, exact-threshold uncertainty, software clarification, prompt injection, out-of-scope routing, video links, and contextual follow-ups.
+- Role and behavior acceptance: 16/16 passed, including greetings and thanks without sources, mixed greeting/procedure retrieval, generic vendor guidance, personalized live-lookup and direct-action refusal, deterministic known and unknown synthetic status examples, synthetic mutation refusal, vendor registration, exact-threshold uncertainty, software clarification, prompt injection, out-of-scope routing, video links, and contextual follow-ups. The suite p95 was 2.344 seconds.
 - Re-run the public role and behavior contract with `python3 scripts/test_live_agent.py`; pass `--verbose` to retain per-scenario evidence in terminal output.
-- `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
-- Local policy/API suite: 92/92 passed.
+- `hi` returned no sources in both the API and deployed UI; `DEMO-REQ-1001` returned a clearly labeled synthetic chat response with no sources; cited PDF and video links returned the correct content types.
+- Local policy/API suite: 99/99 passed.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 

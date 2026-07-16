@@ -39,4 +39,4 @@ AWS_PROFILE=summercamp AWS_REGION=us-west-2 ./scripts/deploy_frontend.sh
 
 The script verifies the AWS account, validates the CloudFormation template, runs frontend checks, builds with the production API URL, uploads cache-safe assets, invalidates CloudFront, and smoke-tests the public HTTPS page. Override `VITE_API_BASE_URL` only when intentionally targeting a different backend.
 
-The API is public/no-auth guidance only. The interface sends the selected guidance role, the current question, and at most six recent conversation items. It displays only the answer and cited source cards returned by the backend.
+The API is public/no-auth guidance only. The interface sends the selected guidance role, the current question, and at most six recent conversation items. It displays the answer and any cited source cards returned by the backend. Synthetic `DEMO-*` records are not advertised in the page UI; an operator can type a known demo identifier directly when a status demonstration is needed.
