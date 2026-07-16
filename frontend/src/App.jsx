@@ -36,9 +36,9 @@ const SOURCE_PANEL_MAX_PERCENT = 64
 const RESIZER_WIDTH = 9
 
 const roles = [
-  { id: 'requester', label: 'Faculty or staff', Icon: UserRound },
-  { id: 'vendor', label: 'Vendor or supplier', Icon: Store },
-  { id: 'internal_staff', label: 'Support staff', Icon: Headphones },
+  { id: 'requester', label: 'Faculty or Staff', Icon: UserRound },
+  { id: 'vendor', label: 'Vendor or Supplier', Icon: Store },
+  { id: 'internal_staff', label: 'Support Staff', Icon: Headphones },
 ]
 
 const startersByRole = {
