@@ -146,10 +146,50 @@ button {
   text-transform: uppercase;
 }
 
+.role-controls {
+  min-width: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .role-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+
+.new-chat-button {
+  min-height: 40px;
+  padding: 8px 12px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #aebee0;
+  border-radius: 5px;
+  color: var(--csub-blue);
+  background: var(--white);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.new-chat-button:hover:not(:disabled) {
+  color: var(--csub-navy);
+  background: var(--soft-blue);
+  border-color: var(--csub-blue);
+}
+
+.new-chat-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .role-option {
@@ -870,6 +910,10 @@ a:focus-visible {
     gap: 9px;
   }
 
+  .role-controls {
+    gap: 9px;
+  }
+
   .role-option {
     min-height: 42px;
     padding: 7px;
@@ -877,6 +921,15 @@ a:focus-visible {
   }
 
   .role-option svg {
+    display: none;
+  }
+
+  .new-chat-button {
+    width: 42px;
+    padding: 0;
+  }
+
+  .new-chat-label {
     display: none;
   }
 
@@ -948,7 +1001,12 @@ a:focus-visible {
   }
 
   .role-options {
-    width: 100%;
+    width: auto;
+    flex: 1;
+  }
+
+  .role-controls {
+    flex: 1;
   }
 
   .conversation {

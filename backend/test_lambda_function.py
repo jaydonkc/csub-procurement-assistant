@@ -5,7 +5,13 @@ from unittest.mock import patch
 
 from backend import grounding, policy, retrieval, source_access, workflows
 from backend import lambda_function as app
-from backend.config import ALLOWED_ORIGIN, MEDIA_URL_TTL_SECONDS, SOURCE_BUCKET
+from backend.config import (
+    ALLOWED_ORIGIN,
+    ESCALATION_CONTACT,
+    ESCALATION_EMAIL,
+    MEDIA_URL_TTL_SECONDS,
+    SOURCE_BUCKET,
+)
 from backend.models import RetrievalDecision
 from backend.pydantic_agent import GroundingFailure
 
@@ -153,6 +159,19 @@ class RequestClassificationTests(unittest.TestCase):
             "requester",
         )
         self.assertIsNone(route)
+
+    def test_capability_escalations_use_configured_contact(self):
+        cases = (
+            ("Show me the PII access guide.", "internal_staff"),
+            ("How do I approve a requisition?", "internal_staff"),
+            ("What is the status of invoice 123456?", "vendor"),
+            ("Submit this requisition for me.", "requester"),
+        )
+        for message, role in cases:
+            with self.subTest(message=message):
+                route = policy.classify_request(message, role)
+                self.assertIsNotNone(route)
+                self.assertIn(ESCALATION_EMAIL, route["answer"])
 
 
 class SourceBoundaryTests(unittest.TestCase):
@@ -380,6 +399,7 @@ class SourceBoundaryTests(unittest.TestCase):
         )
         self.assertIsNotNone(result)
         self.assertIn("CSUBUY Ticket", result[0])
+        self.assertIn(ESCALATION_EMAIL, result[0])
 
     def test_default_address_template_is_source_verified(self):
         sources = [
@@ -460,6 +480,9 @@ class SourceBoundaryTests(unittest.TestCase):
 
 
 class GroundingTests(unittest.TestCase):
+    def test_configured_escalation_contact_does_not_require_citation(self):
+        self.assertIsNone(grounding.citation_coverage_reason(ESCALATION_CONTACT))
+
     def setUp(self):
         self.sources = [
             {"id": "S1", "path": "one.pdf", "kind": "document", "timestamp": None},
@@ -689,6 +712,7 @@ class HandlerTests(unittest.TestCase):
         payload = json.loads(result["body"])
         self.assertEqual(result["statusCode"], 200)
         self.assertIn("will not guess", payload["answer"])
+        self.assertIn(ESCALATION_EMAIL, payload["answer"])
 
     def test_grounded_pydantic_agent_result_returns_only_cited_sources(self):
         sources = [
@@ -748,6 +772,7 @@ class HandlerTests(unittest.TestCase):
         payload = json.loads(result["body"])
         self.assertEqual(result["statusCode"], 200)
         self.assertIn("could not verify", payload["answer"])
+        self.assertIn(ESCALATION_EMAIL, payload["answer"])
         self.assertEqual([source["id"] for source in payload["sources"]], ["S1"])
 
     def test_invalid_role_is_rejected(self):

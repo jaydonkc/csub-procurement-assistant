@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from backend.config import ESCALATION_CONTACT, ESCALATION_EMAIL
 
-AUDIT_INSTRUCTIONS = """You are a strict citation and policy-grounding auditor. Evaluate the proposed answer only against the supplied source excerpts.
+AUDIT_INSTRUCTIONS = f"""You are a strict citation and policy-grounding auditor. Evaluate the proposed answer only against the supplied source excerpts.
 
-Mark valid=false if any procedural, policy, threshold, form, system, timeline, contact, eligibility, or next-step claim is not explicitly supported by its cited excerpt. Also mark false for a wrong citation, an uncited factual claim, a changed numeric boundary or comparison operator, invented steps, or advice generalized beyond the named vendor/system/source scope. Allow only direct literal comparison logic from a cited threshold: for example, a value exactly equal to X does not satisfy a rule written as greater than X. Capability disclaimers and a recommendation to contact the responsible office do not need citations."""
+Mark valid=false if any procedural, policy, threshold, form, system, timeline, contact, eligibility, or next-step claim is not explicitly supported by its cited excerpt. Also mark false for a wrong citation, an uncited factual claim, a changed numeric boundary or comparison operator, invented steps, or advice generalized beyond the named vendor/system/source scope. Allow only direct literal comparison logic from a cited threshold: for example, a value exactly equal to X does not satisfy a rule written as greater than X. Capability disclaimers and the configured escalation sentence "{ESCALATION_CONTACT}" do not need citations. Do not accept any other uncited contact as a substitute for {ESCALATION_EMAIL}."""
 
 
 def cited_source_ids(answer: str) -> set[str]:
@@ -42,6 +43,7 @@ def citation_coverage_reason(answer: str) -> str | None:
         "contact csub ",
         "if you need further assistance, contact ",
         "if you still need help, contact ",
+        "for additional help, contact ",
     )
     lines = answer.splitlines()
     cited_table_lines: set[int] = set()

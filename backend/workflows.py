@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from backend.config import ESCALATION_CONTACT
 from backend.grounding import context_for_citations
 
 
@@ -88,7 +89,7 @@ def guided_template_answer(
 2. Open the **Ship To** tab and choose **Select Addresses for Profile** [{source_id}].
 3. Use **Select Address Template** to choose the address you want as the default [{source_id}].
 
-The retrieved public excerpt does not provide a complete Bill To setup sequence, so contact the responsible CSUB support office if the billing-address tab does not provide enough guidance."""
+The retrieved public excerpt does not provide a complete Bill To setup sequence. {ESCALATION_CONTACT}"""
                 return answer, [source]
 
     if "support ticket" in lowered:
@@ -121,7 +122,7 @@ The retrieved public excerpt does not provide a complete Bill To setup sequence,
 3. Add a detailed **Description** and any useful attachment [{source_id}].
 4. Select **Submit**, or save the ticket as a draft if it is not ready [{source_id}].
 
-The public excerpt does not include the OPTIMIZE portal URL; contact CSUB Procurement or IT support if you need the entry link."""
+The public excerpt does not include the OPTIMIZE portal URL. {ESCALATION_CONTACT}"""
                 return answer, [source]
 
     if any(
@@ -155,7 +156,7 @@ The public excerpt does not include the OPTIMIZE portal URL; contact CSUB Procur
 3. Complete the form's **Questions** and **Requester Contact Information** sections [{source_id}].
 4. Use **Review and Complete** to finish the request form [{source_id}].
 
-If the supplier appears in search results or you are unsure which profile/status applies, stop before creating a duplicate and contact the Campus Supplier Administrator."""
+If the supplier appears in search results or you are unsure which profile/status applies, stop before creating a duplicate. {ESCALATION_CONTACT}"""
                 return answer, [source]
 
     if "fiscal year" in lowered and "accounting date" in lowered:
@@ -185,7 +186,7 @@ If the supplier appears in search results or you are unsure which profile/status
 2. For a new-fiscal-year requisition, use July 1 or a later date in the new fiscal year [{source_id}].
 3. Save the PO Information before submitting the requisition [{source_id}].
 
-If the correct fiscal year is uncertain, confirm the date with the campus Procurement team before submission."""
+If the correct fiscal year is uncertain, do not guess. {ESCALATION_CONTACT}"""
                 return answer, [source]
 
     if "voucher" in lowered and "status" in lowered:

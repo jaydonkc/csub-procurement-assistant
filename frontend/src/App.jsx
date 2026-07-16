@@ -12,6 +12,7 @@ import {
   Laptop,
   PackageCheck,
   PanelRightOpen,
+  Plus,
   Store,
   UserRound,
   UserRoundCog,
@@ -38,24 +39,77 @@ const roles = [
   { id: 'internal_staff', label: 'Support staff', Icon: Headphones },
 ]
 
-const starters = [
-  {
-    text: 'How do I buy software or a subscription?',
-    Icon: Laptop,
-  },
-  {
-    text: 'I need help with a new supplier.',
-    Icon: Store,
-  },
-  {
-    text: 'How do I create a receipt in CSUBUY?',
-    Icon: PackageCheck,
-  },
-  {
-    text: 'How do I update my CSUBUY profile?',
-    Icon: UserRoundCog,
-  },
-]
+const startersByRole = {
+  requester: [
+    {
+      text: 'How do I buy software or a subscription?',
+      Icon: Laptop,
+    },
+    {
+      text: 'I need help with a new supplier.',
+      Icon: Store,
+    },
+    {
+      text: 'How do I create a receipt in CSUBUY?',
+      Icon: PackageCheck,
+    },
+    {
+      text: 'How do I update my CSUBUY profile?',
+      Icon: UserRoundCog,
+    },
+  ],
+  vendor: [
+    {
+      text: 'How do I complete supplier registration after receiving an invitation?',
+      Icon: Store,
+    },
+    {
+      text: 'What information should I include with an invoice?',
+      Icon: FileText,
+    },
+    {
+      text: 'How do I check the status of an invoice or payment?',
+      Icon: Clock3,
+    },
+    {
+      text: 'Who should I contact if supplier onboarding is stalled?',
+      Icon: Headphones,
+    },
+  ],
+  internal_staff: [
+    {
+      text: 'How do I help a requester find or request a supplier?',
+      Icon: Store,
+    },
+    {
+      text: 'Where do I submit a CSUBUY support ticket?',
+      Icon: Headphones,
+    },
+    {
+      text: 'How do I explain voucher pay status?',
+      Icon: Clock3,
+    },
+    {
+      text: 'What public guidance can I share for updating a CSUBUY profile?',
+      Icon: UserRoundCog,
+    },
+  ],
+}
+
+function createEmptyRoleSession() {
+  return {
+    input: '',
+    messages: [],
+    isSending: false,
+    selectedSource: null,
+  }
+}
+
+function createRoleSessions() {
+  return Object.fromEntries(
+    roles.map(({ id }) => [id, createEmptyRoleSession()]),
+  )
+}
 
 function sourceName(path = 'CSUB procurement source') {
   return path.split('/').pop() || path
@@ -337,11 +391,8 @@ function AssistantMessage({
 }
 
 function App() {
-  const [input, setInput] = useState('')
   const [role, setRole] = useState('requester')
-  const [messages, setMessages] = useState([])
-  const [isSending, setIsSending] = useState(false)
-  const [selectedSource, setSelectedSource] = useState(null)
+  const [roleSessions, setRoleSessions] = useState(createRoleSessions)
   const [sourcePanelPercent, setSourcePanelPercent] = useState(
     DEFAULT_SOURCE_PANEL_PERCENT,
   )
@@ -350,35 +401,69 @@ function App() {
   const isResizingSourceRef = useRef(false)
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
-  const sendInFlightRef = useRef(false)
+  const activeRoleRef = useRef(role)
+  const sendInFlightRef = useRef(
+    Object.fromEntries(roles.map(({ id }) => [id, false])),
+  )
+  const { input, messages, isSending, selectedSource } = roleSessions[role]
+  const starters = startersByRole[role]
+
+  function setRoleSessionField(targetRole, field, nextValue) {
+    setRoleSessions((previous) => {
+      const currentSession = previous[targetRole]
+      const value =
+        typeof nextValue === 'function'
+          ? nextValue(currentSession[field])
+          : nextValue
+      return {
+        ...previous,
+        [targetRole]: {
+          ...currentSession,
+          [field]: value,
+        },
+      }
+    })
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, isSending])
 
   async function sendMessage(text = input) {
+    const requestRole = role
     const userText = text.trim()
-    if (!userText || sendInFlightRef.current) return
+    if (!userText || sendInFlightRef.current[requestRole]) return
 
-    const history = messages.slice(-6).map(({ sender, text: messageText }) => ({
-      role: sender,
-      text: messageText,
-    }))
+    const history = roleSessions[requestRole].messages
+      .slice(-6)
+      .map(({ sender, text: messageText }) => ({
+        role: sender,
+        text: messageText,
+      }))
 
-    setInput('')
-    setSelectedSource(null)
-    sendInFlightRef.current = true
-    setIsSending(true)
-    setMessages((previous) => [
-      ...previous,
-      { id: crypto.randomUUID(), sender: 'user', text: userText },
-    ])
+    sendInFlightRef.current[requestRole] = true
+    setRoleSessions((previous) => {
+      const currentSession = previous[requestRole]
+      return {
+        ...previous,
+        [requestRole]: {
+          ...currentSession,
+          input: '',
+          selectedSource: null,
+          isSending: true,
+          messages: [
+            ...currentSession.messages,
+            { id: crypto.randomUUID(), sender: 'user', text: userText },
+          ],
+        },
+      }
+    })
 
     try {
       const data = await fetchJson(CHAT_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, role, history }),
+        body: JSON.stringify({ message: userText, role: requestRole, history }),
       })
 
       if (typeof data.answer !== 'string' || !data.answer.trim()) {
@@ -387,7 +472,7 @@ function App() {
 
       const sources = Array.isArray(data.sources) ? data.sources : []
 
-      setMessages((previous) => [
+      setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
@@ -397,9 +482,9 @@ function App() {
           requestId: data.request_id || '',
         },
       ])
-      setSelectedSource(sources[0] || null)
+      setRoleSessionField(requestRole, 'selectedSource', sources[0] || null)
     } catch (error) {
-      setMessages((previous) => [
+      setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
@@ -412,9 +497,11 @@ function App() {
         },
       ])
     } finally {
-      sendInFlightRef.current = false
-      setIsSending(false)
-      inputRef.current?.focus()
+      sendInFlightRef.current[requestRole] = false
+      setRoleSessionField(requestRole, 'isSending', false)
+      if (activeRoleRef.current === requestRole) {
+        inputRef.current?.focus()
+      }
     }
   }
 
@@ -423,8 +510,22 @@ function App() {
     sendMessage()
   }
 
+  function handleNewChat() {
+    setRoleSessions((previous) => ({
+      ...previous,
+      [role]: createEmptyRoleSession(),
+    }))
+    setSourcePanelPercent(DEFAULT_SOURCE_PANEL_PERCENT)
+    inputRef.current?.focus()
+  }
+
+  function handleRoleChange(nextRole) {
+    activeRoleRef.current = nextRole
+    setRole(nextRole)
+  }
+
   function handleSelectSource(source) {
-    setSelectedSource((currentSource) =>
+    setRoleSessionField(role, 'selectedSource', (currentSource) =>
       currentSource && sourceKey(currentSource) === sourceKey(source)
         ? null
         : source,
@@ -528,21 +629,34 @@ function App() {
         >
           <div className="assistant-main">
             <div className="role-bar">
-            <span className="role-label">I am a</span>
-            <div className="role-options" aria-label="Choose your role">
-              {roles.map(({ id, label, Icon }) => (
-                <button
-                  className={`role-option ${role === id ? 'is-active' : ''}`}
-                  type="button"
-                  key={id}
-                  onClick={() => setRole(id)}
-                  aria-pressed={role === id}
-                >
-                  <Icon size={16} aria-hidden="true" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
+              <button
+                className="new-chat-button"
+                type="button"
+                onClick={handleNewChat}
+                disabled={isSending}
+                aria-label="Start a new chat"
+                title="Start a new chat"
+              >
+                <Plus size={17} aria-hidden="true" />
+                <span className="new-chat-label">New chat</span>
+              </button>
+              <div className="role-controls">
+                <span className="role-label">I am a</span>
+                <div className="role-options" aria-label="Choose your role">
+                  {roles.map(({ id, label, Icon }) => (
+                    <button
+                      className={`role-option ${role === id ? 'is-active' : ''}`}
+                      type="button"
+                      key={id}
+                      onClick={() => handleRoleChange(id)}
+                      aria-pressed={role === id}
+                    >
+                      <Icon size={16} aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
@@ -617,7 +731,9 @@ function App() {
                 value={input}
                 rows="1"
                 maxLength="4000"
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) =>
+                  setRoleSessionField(role, 'input', event.target.value)
+                }
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
@@ -692,7 +808,9 @@ function App() {
               />
               <SourcePanel
                 source={selectedSource}
-                onClose={() => setSelectedSource(null)}
+                onClose={() =>
+                  setRoleSessionField(role, 'selectedSource', null)
+                }
               />
             </>
           )}

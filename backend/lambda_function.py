@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from backend import grounding, policy, retrieval, source_access, workflows
 from backend.config import (
     ALLOWED_ORIGIN,
+    ESCALATION_CONTACT,
     KNOWLEDGE_BASE_ID,
     MAX_BODY_BYTES,
     MAX_CHUNKS_PER_SOURCE,
@@ -271,7 +272,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if not sources:
             answer = (
                 "I could not find an approved public source that supports a reliable answer, so I will not guess. "
-                "Please contact CSUB Procurement or the office responsible for this request."
+                f"{ESCALATION_CONTACT}"
             )
             _log(
                 "request_complete",
@@ -311,7 +312,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             fallback_sources = _sources_with_urls(sources[:3])
             fallback = (
                 "I found potentially relevant public sources, but I could not verify a fully grounded answer to this question, so I will not guess. "
-                "The closest source cards are listed below; contact CSUB Procurement or the responsible support office for confirmation."
+                f"The closest source cards are listed below. {ESCALATION_CONTACT}"
             )
             _log(
                 "request_complete",

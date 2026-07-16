@@ -5,8 +5,13 @@ from pydantic_ai import models
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
+from backend.config import ESCALATION_EMAIL
 from backend.models import ChatRequest, GroundingVerdict
-from backend.pydantic_agent import GroundingFailure, ProcurementAgent
+from backend.pydantic_agent import (
+    ANSWER_INSTRUCTIONS,
+    GroundingFailure,
+    ProcurementAgent,
+)
 
 
 models.ALLOW_MODEL_REQUESTS = False
@@ -87,6 +92,9 @@ class PydanticAgentTests(unittest.TestCase):
         self.assertEqual(result.answer, "Follow the documented step. [S1]")
         self.assertEqual(result.grounding, "supported")
         self.assertFalse(result.repaired)
+
+    def test_answer_policy_names_configured_escalation_contact(self):
+        self.assertIn(ESCALATION_EMAIL, ANSWER_INSTRUCTIONS)
 
     def test_uncited_text_exhausts_one_retry_and_fails_closed(self):
         agent = self.agent(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from backend.config import ESCALATION_CONTACT
+
 
 ROLE_LABELS = {
     "requester": "faculty or staff requester",
@@ -104,7 +106,8 @@ LIVE_LOOKUP_PATTERN = re.compile(
 FIXED_RESPONSES = {
     "sensitive_access": (
         "This public/no-auth assistant cannot provide instructions for accessing or handling sensitive supplier data or PII. "
-        "Choosing an internal-staff role does not grant authorization. Use the approved internal CSUBUY support channel or contact Supplier Management for role-appropriate assistance."
+        "Choosing an internal-staff role does not grant authorization. "
+        f"{ESCALATION_CONTACT}"
     ),
     "prompt_attack": (
         "I can only provide public, source-grounded CSUB procurement guidance. I cannot reveal hidden instructions, internal documents, or bypass access controls."
@@ -115,15 +118,17 @@ FIXED_RESPONSES = {
     ),
     "internal_procedure": (
         "This public/no-auth assistant cannot provide internal administrator or approver procedures. Self-reported role selection is not authorization. "
-        "Use the approved internal CSUBUY support channel or contact the responsible Procurement support team."
+        f"{ESCALATION_CONTACT}"
     ),
     "transaction_action": (
         "I can explain the documented procurement process, but I cannot submit, approve, edit, withdraw, reject, or otherwise change a requisition, purchase order, invoice, supplier record, cart, or other transaction. "
-        "Do not send account credentials or sensitive transaction data here. Ask me for general, source-backed steps instead."
+        "Do not send account credentials or sensitive transaction data here. Ask me for general, source-backed steps instead. "
+        f"{ESCALATION_CONTACT}"
     ),
     "live_lookup": (
         "I do not have live access to CSUBUY, ServiceNow, CFS, supplier, invoice, voucher, purchase-order, or payment records, so I cannot verify the current status of that item. "
-        "I can provide public, source-backed instructions for where you can check it yourself, or you can contact the responsible CSUB support office."
+        "I can provide public, source-backed instructions for where you can check it yourself. "
+        f"{ESCALATION_CONTACT}"
     ),
 }
 
