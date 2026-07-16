@@ -1,2 +1,3 @@
 # Vendor the SDK because managedSearchConfiguration is newer than some Lambda runtime SDK builds.
 boto3==1.43.48
+pydantic-ai-slim[bedrock]==2.10.0

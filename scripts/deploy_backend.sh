@@ -43,6 +43,23 @@ python3 -m pip install \
   --target "${PACKAGE_DIR}" \
   --requirement "${ROOT_DIR}/backend/lambda-requirements.txt"
 cp "${ROOT_DIR}/backend/lambda_function.py" "${PACKAGE_DIR}/lambda_function.py"
+mkdir -p "${PACKAGE_DIR}/backend"
+RUNTIME_MODULES=(
+  __init__.py
+  config.py
+  grounding.py
+  models.py
+  policy.py
+  pydantic_agent.py
+  retrieval.py
+  router.py
+  source_access.py
+  ui.py
+  workflows.py
+)
+for module in "${RUNTIME_MODULES[@]}"; do
+  cp "${ROOT_DIR}/backend/${module}" "${PACKAGE_DIR}/backend/${module}"
+done
 
 ACCOUNT_ID="$(aws sts get-caller-identity \
   --profile "${PROFILE}" \
@@ -56,7 +73,12 @@ fi
 
 (
   cd "${ROOT_DIR}"
-  PYTHONPATH="${PACKAGE_DIR}:${ROOT_DIR}" python3 -m unittest backend/test_lambda_function.py
+  PYTHONPATH="${ROOT_DIR}:${PACKAGE_DIR}" python3 -m unittest backend/test_lambda_function.py
+)
+
+(
+  cd "${BUILD_ROOT}"
+  PYTHONPATH="${PACKAGE_DIR}" python3 -c 'import lambda_function; assert callable(lambda_function.handler)'
 )
 
 (
