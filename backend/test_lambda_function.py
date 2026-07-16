@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from backend import grounding, policy, retrieval, source_access, workflows
+from backend import grounding, policy, retrieval, source_access, status_tool, workflows
 from backend import lambda_function as app
 from backend.config import (
     ALLOWED_ORIGIN,
@@ -172,6 +172,96 @@ class RequestClassificationTests(unittest.TestCase):
                 route = policy.classify_request(message, role)
                 self.assertIsNotNone(route)
                 self.assertIn(ESCALATION_EMAIL, route["answer"])
+
+
+class DemoStatusToolTests(unittest.TestCase):
+    def test_known_demo_invoice_returns_structured_status_without_models(self):
+        with (
+            patch.object(
+                app, "_route_request", side_effect=AssertionError("must not route")
+            ),
+            patch.object(
+                app,
+                "_retrieve_sources",
+                side_effect=AssertionError("must not retrieve"),
+            ),
+            patch.object(
+                app, "_pydantic_runtime", side_effect=AssertionError("must not model")
+            ),
+        ):
+            result = app.handler(
+                post_event(
+                    {
+                        "message": "What is the status of DEMO-INV-3001?",
+                        "role": "vendor",
+                    }
+                ),
+                None,
+            )
+
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(payload["sources"], [])
+        self.assertEqual(payload["status_card"]["record_id"], "DEMO-INV-3001")
+        self.assertEqual(payload["status_card"]["current_stage"], 2)
+        self.assertEqual(len(payload["status_card"]["stages"]), 4)
+        self.assertTrue(payload["status_card"]["is_demo"])
+        self.assertIn("Accounts Payable review", payload["answer"])
+
+    def test_demo_identifier_matching_is_case_insensitive(self):
+        result = status_tool.lookup_status("show demo-po-2001", "requester")
+        self.assertIsNotNone(result)
+        self.assertEqual(result.status_card["record_id"], "DEMO-PO-2001")
+
+    def test_unknown_demo_identifier_fails_closed_without_retrieval(self):
+        with (
+            patch.object(
+                app, "_route_request", side_effect=AssertionError("must not route")
+            ),
+            patch.object(
+                app,
+                "_retrieve_sources",
+                side_effect=AssertionError("must not retrieve"),
+            ),
+        ):
+            result = app.handler(
+                post_event(
+                    {
+                        "message": "Check DEMO-INV-9999",
+                        "role": "requester",
+                    }
+                ),
+                None,
+            )
+
+        payload = json.loads(result["body"])
+        self.assertEqual(result["statusCode"], 200)
+        self.assertNotIn("status_card", payload)
+        self.assertEqual(payload["sources"], [])
+        self.assertIn("No live procurement system was queried", payload["answer"])
+
+    def test_multiple_demo_identifiers_request_one_record(self):
+        result = status_tool.lookup_status(
+            "Compare DEMO-REQ-1001 and DEMO-PO-2001", "internal_staff"
+        )
+        self.assertEqual(result.outcome, "multiple_ids")
+        self.assertIsNone(result.status_card)
+
+    def test_demo_mutation_is_blocked_before_status_lookup(self):
+        route = policy.classify_request("Cancel DEMO-PO-2001", "requester")
+        self.assertEqual(route["route"], "transaction_action")
+
+    def test_non_demo_live_identifier_remains_blocked(self):
+        route = policy.classify_request(
+            "What is the status of invoice 123456?", "requester"
+        )
+        self.assertEqual(route["route"], "live_lookup")
+
+    def test_demo_records_contain_no_sensitive_identity_fields(self):
+        forbidden_labels = {"ssn", "bank account", "routing number", "email"}
+        for record in status_tool.DEMO_RECORDS.values():
+            labels = {field["label"].casefold() for field in record["fields"]}
+            self.assertTrue(labels.isdisjoint(forbidden_labels))
 
 
 class SourceBoundaryTests(unittest.TestCase):

@@ -3,8 +3,11 @@ import ReactMarkdown from 'react-markdown'
 import {
   ArrowUp,
   Building2,
+  Check,
   Clock3,
   CirclePlay,
+  ClipboardList,
+  Database,
   ExternalLink,
   FileText,
   FileVideo2,
@@ -102,6 +105,7 @@ function createEmptyRoleSession() {
     messages: [],
     isSending: false,
     selectedSource: null,
+    selectedStatus: null,
   }
 }
 
@@ -117,6 +121,10 @@ function sourceName(path = 'CSUB procurement source') {
 
 function sourceKey(source) {
   return `${source.id}-${source.path}-${source.timestamp || ''}`
+}
+
+function statusKey(status) {
+  return status?.record_id || ''
 }
 
 function isVideoSource(source) {
@@ -365,10 +373,138 @@ function SourcePanel({ source, onClose }) {
   )
 }
 
+function StatusResult({ status, onSelectStatus, isActive }) {
+  if (!status) return null
+
+  return (
+    <div className="status-result" aria-label="Transaction status result">
+      <div className="source-heading">
+        <ClipboardList size={15} aria-hidden="true" />
+        <span>Status details</span>
+      </div>
+      <button
+        className={`status-result-button ${isActive ? 'is-active' : ''}`}
+        type="button"
+        onClick={() => onSelectStatus(status)}
+        aria-pressed={isActive}
+      >
+        <span className="status-result-icon" aria-hidden="true">
+          <ClipboardList size={18} />
+        </span>
+        <span className="status-result-copy">
+          <strong>{status.record_id}</strong>
+          <span>{status.status}</span>
+        </span>
+        <PanelRightOpen size={17} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+function StatusPanel({ status, onClose }) {
+  const stages = Array.isArray(status.stages) ? status.stages : []
+  const fields = Array.isArray(status.fields) ? status.fields : []
+
+  return (
+    <aside
+      className="source-panel status-panel"
+      aria-labelledby="status-panel-title"
+    >
+      <div className="source-panel-header status-panel-header">
+        <div>
+          <span className="source-kicker">Demo status</span>
+          <h2 id="status-panel-title">{status.record_id}</h2>
+        </div>
+        <div className="source-panel-actions">
+          <span className="demo-pill">Synthetic</span>
+          <button
+            className="source-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close status panel"
+            title="Close status panel"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="source-panel-body status-panel-body">
+        <div className="status-summary">
+          <span className="status-record-type">{status.record_type}</span>
+          <h3>{status.title}</h3>
+          <span className="status-current">{status.status}</span>
+          <span className="status-updated">Updated {status.last_updated}</span>
+        </div>
+
+        <section className="status-progress" aria-labelledby="status-progress-title">
+          <div className="status-section-heading">
+            <span id="status-progress-title">Progress</span>
+            <strong>
+              Step {status.current_stage} of {stages.length}
+            </strong>
+          </div>
+          <ol
+            className="status-steps"
+            style={{ '--stage-count': stages.length }}
+          >
+            {stages.map((stage, index) => {
+              const step = index + 1
+              const state =
+                step < status.current_stage
+                  ? 'complete'
+                  : step === status.current_stage
+                    ? 'current'
+                    : 'upcoming'
+              return (
+                <li className={`status-step is-${state}`} key={stage}>
+                  <span className="status-step-marker" aria-hidden="true">
+                    {state === 'complete' ? <Check size={14} /> : step}
+                  </span>
+                  <span className="status-step-label">{stage}</span>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
+
+        <section className="status-field-section" aria-labelledby="status-fields-title">
+          <div className="status-section-heading">
+            <span id="status-fields-title">Record details</span>
+          </div>
+          <dl className="status-fields">
+            {fields.map((field) => (
+              <div key={field.label}>
+                <dt>{field.label}</dt>
+                <dd>{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <section className="status-next-step" aria-labelledby="status-next-title">
+          <span id="status-next-title">What happens next</span>
+          <p>{status.next_step}</p>
+        </section>
+
+        <div className="status-demo-note">
+          <Database size={17} aria-hidden="true" />
+          <p>
+            Synthetic demonstration record. It is not connected to CSUBUY or
+            any live CSUB system.
+          </p>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
 function AssistantMessage({
   message,
   onSelectSource,
+  onSelectStatus,
   selectedSourceKey,
+  selectedStatusKey,
 }) {
   return (
     <article className="message assistant-message">
@@ -380,6 +516,11 @@ function AssistantMessage({
         <div className="markdown">
           <ReactMarkdown>{message.text}</ReactMarkdown>
         </div>
+        <StatusResult
+          status={message.statusCard}
+          onSelectStatus={onSelectStatus}
+          isActive={selectedStatusKey === statusKey(message.statusCard)}
+        />
         <SourceList
           sources={message.sources}
           onSelectSource={onSelectSource}
@@ -405,7 +546,9 @@ function App() {
   const sendInFlightRef = useRef(
     Object.fromEntries(roles.map(({ id }) => [id, false])),
   )
-  const { input, messages, isSending, selectedSource } = roleSessions[role]
+  const { input, messages, isSending, selectedSource, selectedStatus } =
+    roleSessions[role]
+  const hasDetailPanel = Boolean(selectedSource || selectedStatus)
   const starters = startersByRole[role]
 
   function setRoleSessionField(targetRole, field, nextValue) {
@@ -450,6 +593,7 @@ function App() {
           ...currentSession,
           input: '',
           selectedSource: null,
+          selectedStatus: null,
           isSending: true,
           messages: [
             ...currentSession.messages,
@@ -471,6 +615,10 @@ function App() {
       }
 
       const sources = Array.isArray(data.sources) ? data.sources : []
+      const statusCard =
+        data.status_card && typeof data.status_card === 'object'
+          ? data.status_card
+          : null
 
       setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
@@ -479,10 +627,16 @@ function App() {
           sender: 'assistant',
           text: data.answer,
           sources,
+          statusCard,
           requestId: data.request_id || '',
         },
       ])
-      setRoleSessionField(requestRole, 'selectedSource', sources[0] || null)
+      setRoleSessionField(
+        requestRole,
+        'selectedSource',
+        statusCard ? null : sources[0] || null,
+      )
+      setRoleSessionField(requestRole, 'selectedStatus', statusCard)
     } catch (error) {
       setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
@@ -494,6 +648,7 @@ function App() {
               ? `I could not connect to the assistant. ${error.message}`
               : 'I could not connect to the assistant. Please try again.',
           sources: [],
+          statusCard: null,
         },
       ])
     } finally {
@@ -525,10 +680,18 @@ function App() {
   }
 
   function handleSelectSource(source) {
+    setRoleSessionField(role, 'selectedStatus', null)
     setRoleSessionField(role, 'selectedSource', (currentSource) =>
       currentSource && sourceKey(currentSource) === sourceKey(source)
         ? null
         : source,
+    )
+  }
+
+  function handleSelectStatus(status) {
+    setRoleSessionField(role, 'selectedSource', null)
+    setRoleSessionField(role, 'selectedStatus', (currentStatus) =>
+      statusKey(currentStatus) === statusKey(status) ? null : status,
     )
   }
 
@@ -619,9 +782,9 @@ function App() {
       <main className="workspace">
         <section
           ref={assistantPanelRef}
-          className={`assistant-panel ${selectedSource ? 'has-source-panel' : ''} ${isResizingSource ? 'is-resizing-source' : ''}`}
+          className={`assistant-panel ${hasDetailPanel ? 'has-detail-panel' : ''} ${isResizingSource ? 'is-resizing-source' : ''}`}
           style={
-            selectedSource
+            hasDetailPanel
               ? { '--source-panel-width': `${sourcePanelPercent}%` }
               : undefined
           }
@@ -690,9 +853,11 @@ function App() {
                       key={message.id}
                       message={message}
                       onSelectSource={handleSelectSource}
+                      onSelectStatus={handleSelectStatus}
                       selectedSourceKey={
                         selectedSource ? sourceKey(selectedSource) : ''
                       }
+                      selectedStatusKey={statusKey(selectedStatus)}
                     />
                   ) : (
                     <article className="message user-message" key={message.id}>
@@ -760,13 +925,13 @@ function App() {
             </form>
           </div>
 
-          {selectedSource && (
+          {hasDetailPanel && (
             <>
               <div
                 className="source-resizer"
                 role="separator"
                 tabIndex="0"
-                aria-label="Resize source panel"
+                aria-label={`Resize ${selectedStatus ? 'status' : 'source'} panel`}
                 aria-orientation="vertical"
                 aria-valuemin={Math.round(
                   (MIN_SOURCE_PANEL_WIDTH /
@@ -806,12 +971,21 @@ function App() {
                 }}
                 onKeyDown={handleResizeKeyDown}
               />
-              <SourcePanel
-                source={selectedSource}
-                onClose={() =>
-                  setRoleSessionField(role, 'selectedSource', null)
-                }
-              />
+              {selectedStatus ? (
+                <StatusPanel
+                  status={selectedStatus}
+                  onClose={() =>
+                    setRoleSessionField(role, 'selectedStatus', null)
+                  }
+                />
+              ) : (
+                <SourcePanel
+                  source={selectedSource}
+                  onClose={() =>
+                    setRoleSessionField(role, 'selectedSource', null)
+                  }
+                />
+              )}
             </>
           )}
         </section>

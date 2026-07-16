@@ -82,9 +82,40 @@ class SourceCard(BaseModel):
     media_expires_in: int | None = None
 
 
+class StatusField(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=80)
+    value: str = Field(min_length=1, max_length=180)
+
+
+class StatusCard(BaseModel):
+    """Structured read-only status details for the side panel."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    record_id: str = Field(pattern=r"^DEMO-[A-Z]{2,5}-\d{4}$")
+    record_type: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=180)
+    status: str = Field(min_length=1, max_length=120)
+    current_stage: int = Field(ge=1, le=8)
+    stages: list[str] = Field(min_length=2, max_length=8)
+    fields: list[StatusField] = Field(min_length=1, max_length=8)
+    next_step: str = Field(min_length=1, max_length=400)
+    last_updated: str = Field(min_length=1, max_length=120)
+    is_demo: bool = True
+
+    @model_validator(mode="after")
+    def current_stage_exists(self) -> "StatusCard":
+        if self.current_stage > len(self.stages):
+            raise ValueError("Current stage must exist in the supplied stages.")
+        return self
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: list[SourceCard] = Field(default_factory=list)
+    status_card: StatusCard | None = None
     request_id: str
 
 

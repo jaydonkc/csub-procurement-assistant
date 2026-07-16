@@ -42,15 +42,20 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 
 1. Validate and bound the request body, role, message, and recent history.
 2. Apply deterministic capability, access, prompt-injection, and PII gates.
-3. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
-4. Return bounded natural language with no sources for non-retrieval turns; deterministic capability escalations direct users to `bwholgemuth1@csub.edu`.
-5. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
-6. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
-7. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
-8. Attempt one constrained correction; fail closed if the answer remains unsupported and provide the configured escalation contact.
-9. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
+3. On the development demo branch only, resolve exact `DEMO-*` identifiers through the deterministic synthetic status provider and return a structured status card without calling retrieval or a model.
+4. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
+5. Return bounded natural language with no sources for non-retrieval turns; deterministic capability escalations direct users to `bwholgemuth1@csub.edu`.
+6. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
+7. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
+8. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
+9. Attempt one constrained correction; fail closed if the answer remains unsupported and provide the configured escalation contact.
+10. Return only cited public source cards, optional structured demo status, optional 15-minute private source links, and privacy-preserving request metadata.
 
 The frozen public agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording and suggested questions only and never authorize restricted content. Public escalation responses direct users to `bwholgemuth1@csub.edu`. Any requester/vendor status lookup added to the MVP must use authenticated read-only integration and backend authorization before returning personalized records.
+
+The `codex/demo-status-panel` branch adds only unmistakably synthetic records stored in the Lambda package. It is a demo of the future response shape, not authenticated status access and not a connection to CSUBUY. A real provider should sit behind a read-only tool boundary with identity and record-level authorization enforced independently of model output.
+
+The development branch passes 93/93 focused backend tests, including structured status responses, no-model/no-retrieval demo lookup, unknown-ID failure, mutation blocking, and preservation of the ordinary no-live-access boundary. This count is separate from the frozen version `18` acceptance record below.
 
 ## Pydantic AI Development Refactor
 

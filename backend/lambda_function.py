@@ -15,7 +15,7 @@ from typing import Any
 import boto3
 from pydantic import ValidationError
 
-from backend import grounding, policy, retrieval, source_access, workflows
+from backend import grounding, policy, retrieval, source_access, status_tool, workflows
 from backend.config import (
     ALLOWED_ORIGIN,
     ESCALATION_CONTACT,
@@ -194,10 +194,12 @@ def _chat_payload(
     answer: str,
     sources: list[dict[str, Any]],
     request_id: str,
+    status_card: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return ChatResponse(
         answer=answer,
         sources=sources,
+        status_card=status_card,
         request_id=request_id,
     ).model_dump(mode="json", exclude_none=True)
 
@@ -252,6 +254,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 grounding="not_applicable",
             )
             return response(200, _chat_payload(route["answer"], [], request_id))
+
+        status_result = status_tool.lookup_status(message, role)
+        if status_result:
+            _log(
+                "request_complete",
+                request_id,
+                route="status_tool",
+                status_outcome=status_result.outcome,
+                source_count=0,
+                grounding="synthetic_demo",
+            )
+            return response(
+                200,
+                _chat_payload(
+                    status_result.answer,
+                    [],
+                    request_id,
+                    status_result.status_card,
+                ),
+            )
 
         retrieval_decision = _route_request(message, role, history)
         if retrieval_decision.route != "retrieve":

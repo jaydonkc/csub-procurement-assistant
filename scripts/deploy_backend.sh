@@ -66,6 +66,7 @@ RUNTIME_MODULES=(
   retrieval.py
   router.py
   source_access.py
+  status_tool.py
   ui.py
   workflows.py
 )
@@ -96,6 +97,7 @@ root = pathlib.Path(sys.argv[1])
 required = [
     root / "lambda_function.py",
     root / "backend" / "pydantic_agent.py",
+    root / "backend" / "status_tool.py",
     root / "pydantic_ai",
 ]
 missing = [str(path) for path in required if not path.exists()]
