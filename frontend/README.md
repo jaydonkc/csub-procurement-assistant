@@ -46,7 +46,7 @@ The current API is public/no-auth guidance only. The interface changes its sugge
 
 Each role keeps its own in-memory conversation, draft, and open detail panel while the page remains loaded. Switching roles opens that role's session, and switching back restores it. After a conversation starts, the role bar provides a **New chat** action that clears only the selected role's messages, draft, and open detail panel.
 
-On `codex/demo-status-panel`, asking for an approved synthetic identifier such as `DEMO-INV-3001` opens a read-only status panel on the right. The panel shows a staged progress bar, record fields, last-updated time, and next step. The `DEMO-*` record identifier is the only user-visible demo marker; the answer and panel do not add separate demo or synthetic labels. The panel can be reopened from the status result in chat, and there is no demo banner on the empty page.
+In the deployed version, asking for an approved synthetic identifier such as `DEMO-INV-3001` opens a read-only status panel on the right. The panel shows a staged progress bar, record fields, last-updated time, and next step. The `DEMO-*` record identifier is the only user-visible demo marker; the answer and panel do not add separate demo or synthetic labels. The panel can be reopened from the status result in chat, and there is no demo banner on the empty page.
 
 When the assistant cannot safely complete public guidance or a request requires human support, it directs the user to `bwholgemuth1@csub.edu`.
 
