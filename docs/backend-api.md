@@ -1,6 +1,6 @@
 # Backend API
 
-Status: live and verified July 16, 2026 on Lambda version `21`.
+Status: live and verified July 16, 2026 on Lambda version `22`.
 
 ## Endpoints
 
@@ -45,7 +45,7 @@ Conversation, clarification, out-of-scope, safety, and capability routes can ret
 
 ### Synthetic status response
 
-Production version `21` recognizes one exact synthetic identifier before retrieval or model execution. The four demo identifiers are `DEMO-REQ-1001`, `DEMO-PO-2001`, `DEMO-INV-3001`, and `DEMO-VCH-4002`. A successful lookup uses the normal response plus `status_card`:
+Production version `21` introduced exact synthetic-identifier handling before retrieval or model execution, and version `22` retains it. The four demo identifiers are `DEMO-REQ-1001`, `DEMO-PO-2001`, `DEMO-INV-3001`, and `DEMO-VCH-4002`. A successful lookup uses the normal response plus `status_card`:
 
 ```json
 {
@@ -66,7 +66,7 @@ Production version `21` recognizes one exact synthetic identifier before retriev
 }
 ```
 
-Unknown or multiple demo identifiers fail closed without retrieval. Mutation requests remain blocked. Ordinary record numbers still return the no-live-access boundary. The optional response field is deployed behind the immutable `production` alias on Lambda version `21`.
+Unknown or multiple demo identifiers fail closed without retrieval. Mutation requests remain blocked. Ordinary record numbers still return the no-live-access boundary. The optional response field is deployed behind the immutable `production` alias on Lambda version `22`.
 
 The rendered experience uses the `DEMO-*` record identifier as its only demo marker. User-facing answer text, status headings, field values, and badges do not add separate demo or synthetic labels.
 
