@@ -259,6 +259,27 @@ Acceptance criteria:
 - For a question covered in a training video, the assistant can link to the relevant time range.
 - The user can answer their question without watching the full video.
 
+### F6A. Captioned Video Playback
+
+Priority: Should have / accessibility
+
+User need:
+Users who rely on captions need accessible playback when the assistant previews a cited training video.
+
+Behavior:
+- Provide captions in the in-app video preview when an approved caption file is available.
+- Generate or serve captions from the same approved transcript source used for retrieval so playback, transcript excerpts, and citations stay aligned.
+- Treat caption files as playback assets, not separate knowledge-base sources when the transcript content is already indexed.
+
+Output:
+- Caption-enabled video preview.
+- Caption language label.
+- Cited transcript segment or equivalent readable text fallback.
+
+Acceptance criteria:
+- Video previews expose captions when approved caption files are available.
+- Cited video answers include a readable transcript fallback for accessibility.
+
 ### F7. Screenshot And Visual Reference Support
 
 Priority: Should have
@@ -590,6 +611,7 @@ Must have:
 Should have:
 - FAQ/common questions page.
 - Video transcript and timestamp support.
+- Captioned video playback.
 - Screenshot and visual reference support.
 - Requisition status guidance.
 - Authenticated read-only requisition/vendor status lookup if the demo commits to showing where work stands.

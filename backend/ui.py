@@ -34,12 +34,7 @@ INDEX_HTML = r"""<!doctype html>
         <button class="role" data-role="internal_staff">Internal support staff</button>
       </div>
       <h2 style="margin-top:20px">Guided starts</h2>
-      <div class="starters">
-        <button class="starter">I need to buy software or a subscription.</button>
-        <button class="starter">I need help with a new supplier.</button>
-        <button class="starter">How do I create or change a requisition?</button>
-        <button class="starter">I need invoice or payment guidance.</button>
-      </div>
+      <div id="starters" class="starters"><span class="notice">Choose a role to see suggested questions.</span></div>
       <div class="notice">This assistant cannot submit, approve, edit, or look up live transactions. Choosing a role changes guidance wording but does not unlock internal procedures.</div>
     </aside>
     <section class="panel">
@@ -48,9 +43,10 @@ INDEX_HTML = r"""<!doctype html>
     </section>
   </main>
   <script>
-    let role="",history=[];const messages=document.getElementById("messages"),input=document.getElementById("input"),send=document.getElementById("send");
-    document.querySelectorAll(".role").forEach(b=>b.onclick=()=>{document.querySelectorAll(".role").forEach(x=>x.classList.remove("active"));b.classList.add("active");role=b.dataset.role;input.focus()});
-    document.querySelectorAll(".starter").forEach(b=>b.onclick=()=>{input.value=b.textContent;input.focus()});
+    const startersByRole={requester:["How do I buy software or a subscription?","I need help with a new supplier.","How do I create a receipt in CSUBUY?","How do I update my CSUBUY profile?"],vendor:["How do I complete supplier registration after receiving an invitation?","What information should I include with an invoice?","How do I check the status of an invoice or payment?","Who should I contact if supplier onboarding is stalled?"],internal_staff:["How do I help a requester find or request a supplier?","Where do I submit a CSUBUY support ticket?","How do I explain voucher pay status?","What public guidance can I share for updating a CSUBUY profile?"]};
+    let role="",history=[];const messages=document.getElementById("messages"),input=document.getElementById("input"),send=document.getElementById("send"),starterContainer=document.getElementById("starters");
+    function renderStarters(selectedRole){starterContainer.replaceChildren();startersByRole[selectedRole].forEach(text=>{const button=document.createElement("button");button.className="starter";button.type="button";button.textContent=text;button.onclick=()=>{input.value=text;input.focus()};starterContainer.appendChild(button)})}
+    document.querySelectorAll(".role").forEach(b=>b.onclick=()=>{document.querySelectorAll(".role").forEach(x=>x.classList.remove("active"));b.classList.add("active");role=b.dataset.role;renderStarters(role);input.focus()});
     function add(text,kind,sources=[]){const box=document.createElement("div");box.className=`msg ${kind}`;box.textContent=text;if(sources.length){const wrap=document.createElement("div");wrap.className="sources";wrap.textContent="Sources";sources.forEach(s=>{const row=document.createElement("div");row.className="source";row.textContent=`• [${s.id}] ${s.path}${s.timestamp?` · ${s.timestamp}`:""}`;wrap.appendChild(row)});box.appendChild(wrap)}messages.appendChild(box);messages.scrollTop=messages.scrollHeight}
     document.getElementById("chat").onsubmit=async e=>{e.preventDefault();const message=input.value.trim();if(!message)return;if(!role){add("Please choose requester, vendor, or internal support staff first.","assistant");return}const prior=history.slice(-6);add(message,"user");history.push({role:"user",text:message});input.value="";send.disabled=true;
       try{const response=await fetch(location.href,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message,role,history:prior})});const data=await response.json();if(!response.ok)throw new Error(data.error||"Request failed");add(data.answer,"assistant",data.sources||[]);history.push({role:"assistant",text:data.answer})}catch(err){add(`The service could not answer: ${err.message}`,"assistant")}finally{send.disabled=false;input.focus()}}

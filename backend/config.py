@@ -20,6 +20,9 @@ MAX_HISTORY_ITEM_LENGTH = 2_000
 MAX_CONTEXT_EXCERPTS = 8
 MAX_CHUNKS_PER_SOURCE = 2
 
+ESCALATION_EMAIL = "bwholgemuth1@csub.edu"
+ESCALATION_CONTACT = f"For additional help, contact {ESCALATION_EMAIL}."
+
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 SOURCE_BUCKET = os.environ.get(
     "SOURCE_BUCKET",

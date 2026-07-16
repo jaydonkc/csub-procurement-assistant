@@ -23,6 +23,7 @@ Backend modules:
 - `backend/grounding.py` - citation normalization and deterministic grounding checks.
 - `backend/pydantic_agent.py` - Pydantic AI routing, generation, structured auditing, and one-retry/fail-closed behavior.
 - `backend/source_access.py` - internal-source exclusion and short-lived S3 source links.
+- `backend/status_tool.py` - deterministic synthetic status provider and future read-only integration boundary.
 
 The Pydantic AI orchestration is now part of the deployed Lambda path. Deployments still publish immutable Lambda versions and move the `production` alias only after local policy tests plus pre-alias and post-alias smoke tests pass.
 
@@ -68,7 +69,7 @@ Live status verified July 15, 2026: the source-aware Knowledge Base is active an
 
 The chunked retrieval configuration passed a 12-scenario guided procurement comparison against the previous default chunker: 12/12 expected-source hits, better procedural coverage and source ranking, fewer duplicate context chunks after a two-chunks-per-source cap, useful timestamps for all five video-oriented questions, and no internal-source results under the public filter. The AWS test chatbot now uses this configuration.
 
-The production agent behavior is frozen as Lambda version `14` behind the `production` alias and served through API Gateway. It uses Claude Sonnet 4.6 for grounded generation and Claude Haiku 4.5 for retrieval routing and citation auditing. Deterministic pre-model gates in the public agent block transaction actions, unauthenticated live lookups, internal/admin procedures, PII-access guidance, prompt injection, and explicit out-of-scope topics. Source-verified guided templates cover frequent workflows, while other answers must pass citation syntax, public-source, numeric-boundary, source-scope, and entailment checks or fail closed.
+The production agent behavior is frozen as Lambda version `21` behind the `production` alias and served through API Gateway. It uses Claude Sonnet 4.6 for grounded generation and Claude Haiku 4.5 for retrieval routing and citation auditing. Deterministic pre-model gates in the public agent block transaction actions, unauthenticated live lookups, internal/admin procedures, PII-access guidance, prompt injection, and explicit out-of-scope topics. Exact `DEMO-*` identifiers use a deterministic packaged status provider and structured progress panel without retrieval or model generation. Source-verified guided templates cover frequent workflows, while other answers must pass citation syntax, public-source, numeric-boundary, source-scope, and entailment checks or fail closed.
 
 The final acceptance run passed 13/13 guided end-to-end scenarios with the expected source and valid citations, 8/8 adversarial/capability boundaries, 3/3 video timestamp checks, zero internal-source leaks, zero duplicate source cards, and 8.193-second p95 end-to-end latency. The broader raw-retrieval suite retained 34/36 exact-source hits and 93.1% mean term coverage; guided routing is evaluated separately because the product is not a generic similarity-search chatbot.
 
@@ -115,9 +116,19 @@ uv pip install --python .venv/bin/python -r requirements.txt
 ruff check backend
 npm --prefix frontend run lint
 npm --prefix frontend run build
+.venv/bin/python scripts/run_response_evals.py --dry-run
 ```
 
 Build Lambda dependencies for its Linux ARM64 runtime; do not deploy packages copied from the local macOS virtual environment.
+
+Run the JSON-driven live response suite with:
+
+```bash
+.venv/bin/python scripts/run_response_evals.py \
+  --output outputs/response-evals/production.json
+```
+
+See [evals/README.md](evals/README.md) for scenario filters, assertion semantics, and alternate endpoints.
 
 ## MVP Differentiators
 

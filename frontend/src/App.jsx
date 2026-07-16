@@ -3,8 +3,10 @@ import ReactMarkdown from 'react-markdown'
 import {
   ArrowUp,
   Building2,
+  Check,
   Clock3,
   CirclePlay,
+  ClipboardList,
   ExternalLink,
   FileText,
   FileVideo2,
@@ -12,6 +14,7 @@ import {
   Laptop,
   PackageCheck,
   PanelRightOpen,
+  Plus,
   Store,
   UserRound,
   UserRoundCog,
@@ -38,24 +41,78 @@ const roles = [
   { id: 'internal_staff', label: 'Support staff', Icon: Headphones },
 ]
 
-const starters = [
-  {
-    text: 'How do I buy software or a subscription?',
-    Icon: Laptop,
-  },
-  {
-    text: 'I need help with a new supplier.',
-    Icon: Store,
-  },
-  {
-    text: 'How do I create a receipt in CSUBUY?',
-    Icon: PackageCheck,
-  },
-  {
-    text: 'How do I update my CSUBUY profile?',
-    Icon: UserRoundCog,
-  },
-]
+const startersByRole = {
+  requester: [
+    {
+      text: 'How do I buy software or a subscription?',
+      Icon: Laptop,
+    },
+    {
+      text: 'I need help with a new supplier.',
+      Icon: Store,
+    },
+    {
+      text: 'How do I create a receipt in CSUBUY?',
+      Icon: PackageCheck,
+    },
+    {
+      text: 'How do I update my CSUBUY profile?',
+      Icon: UserRoundCog,
+    },
+  ],
+  vendor: [
+    {
+      text: 'How do I complete supplier registration after receiving an invitation?',
+      Icon: Store,
+    },
+    {
+      text: 'What information should I include with an invoice?',
+      Icon: FileText,
+    },
+    {
+      text: 'How do I check the status of an invoice or payment?',
+      Icon: Clock3,
+    },
+    {
+      text: 'Who should I contact if supplier onboarding is stalled?',
+      Icon: Headphones,
+    },
+  ],
+  internal_staff: [
+    {
+      text: 'How do I help a requester find or request a supplier?',
+      Icon: Store,
+    },
+    {
+      text: 'Where do I submit a CSUBUY support ticket?',
+      Icon: Headphones,
+    },
+    {
+      text: 'How do I explain voucher pay status?',
+      Icon: Clock3,
+    },
+    {
+      text: 'What public guidance can I share for updating a CSUBUY profile?',
+      Icon: UserRoundCog,
+    },
+  ],
+}
+
+function createEmptyRoleSession() {
+  return {
+    input: '',
+    messages: [],
+    isSending: false,
+    selectedSource: null,
+    selectedStatus: null,
+  }
+}
+
+function createRoleSessions() {
+  return Object.fromEntries(
+    roles.map(({ id }) => [id, createEmptyRoleSession()]),
+  )
+}
 
 function sourceName(path = 'CSUB procurement source') {
   return path.split('/').pop() || path
@@ -63,6 +120,10 @@ function sourceName(path = 'CSUB procurement source') {
 
 function sourceKey(source) {
   return `${source.id}-${source.path}-${source.timestamp || ''}`
+}
+
+function statusKey(status) {
+  return status?.record_id || ''
 }
 
 function isVideoSource(source) {
@@ -103,6 +164,14 @@ function formatPlaybackTime(seconds) {
   return hours
     ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
     : `${minutes}:${String(remainder).padStart(2, '0')}`
+}
+
+function formatTimestampRange(timestamp) {
+  const range = parseTimestampRange(timestamp)
+  if (range.start === null) return timestamp
+  const start = formatPlaybackTime(range.start)
+  const end = range.end === null ? '' : ` --> ${formatPlaybackTime(range.end)}`
+  return `${start}${end}`
 }
 
 function playbackUrl(source, range) {
@@ -174,7 +243,9 @@ function SourceList({ sources, onSelectSource, selectedSourceKey }) {
                   <span className="source-name">{sourceName(source.path)}</span>
                 </span>
                 {source.timestamp && (
-                  <span className="source-time">{source.timestamp}</span>
+                  <span className="source-time">
+                    {formatTimestampRange(source.timestamp)}
+                  </span>
                 )}
               </span>
               {videoSource ? (
@@ -311,10 +382,130 @@ function SourcePanel({ source, onClose }) {
   )
 }
 
+function StatusResult({ status, onSelectStatus, isActive }) {
+  if (!status) return null
+
+  return (
+    <div className="status-result" aria-label="Transaction status result">
+      <div className="source-heading">
+        <ClipboardList size={15} aria-hidden="true" />
+        <span>Status details</span>
+      </div>
+      <button
+        className={`status-result-button ${isActive ? 'is-active' : ''}`}
+        type="button"
+        onClick={() => onSelectStatus(status)}
+        aria-pressed={isActive}
+      >
+        <span className="status-result-icon" aria-hidden="true">
+          <ClipboardList size={18} />
+        </span>
+        <span className="status-result-copy">
+          <strong>{status.record_id}</strong>
+          <span>{status.status}</span>
+        </span>
+        <PanelRightOpen size={17} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+function StatusPanel({ status, onClose }) {
+  const stages = Array.isArray(status.stages) ? status.stages : []
+  const fields = Array.isArray(status.fields) ? status.fields : []
+
+  return (
+    <aside
+      className="source-panel status-panel"
+      aria-labelledby="status-panel-title"
+    >
+      <div className="source-panel-header status-panel-header">
+        <div>
+          <span className="source-kicker">Status</span>
+          <h2 id="status-panel-title">{status.record_id}</h2>
+        </div>
+        <div className="source-panel-actions">
+          <button
+            className="source-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close status panel"
+            title="Close status panel"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="source-panel-body status-panel-body">
+        <div className="status-summary">
+          <span className="status-record-type">{status.record_type}</span>
+          <h3>{status.title}</h3>
+          <span className="status-current">{status.status}</span>
+          <span className="status-updated">Updated {status.last_updated}</span>
+        </div>
+
+        <section className="status-progress" aria-labelledby="status-progress-title">
+          <div className="status-section-heading">
+            <span id="status-progress-title">Progress</span>
+            <strong>
+              Step {status.current_stage} of {stages.length}
+            </strong>
+          </div>
+          <ol
+            className="status-steps"
+            style={{ '--stage-count': stages.length }}
+          >
+            {stages.map((stage, index) => {
+              const step = index + 1
+              const state =
+                step < status.current_stage
+                  ? 'complete'
+                  : step === status.current_stage
+                    ? 'current'
+                    : 'upcoming'
+              return (
+                <li className={`status-step is-${state}`} key={stage}>
+                  <span className="status-step-marker" aria-hidden="true">
+                    {state === 'complete' ? <Check size={14} /> : step}
+                  </span>
+                  <span className="status-step-label">{stage}</span>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
+
+        <section className="status-field-section" aria-labelledby="status-fields-title">
+          <div className="status-section-heading">
+            <span id="status-fields-title">Record details</span>
+          </div>
+          <dl className="status-fields">
+            {fields.map((field) => (
+              <div key={field.label}>
+                <dt>{field.label}</dt>
+                <dd>{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <section className="status-next-step" aria-labelledby="status-next-title">
+          <span id="status-next-title">What happens next</span>
+          <p>{status.next_step}</p>
+        </section>
+
+      </div>
+    </aside>
+  )
+}
+
 function AssistantMessage({
   message,
   onSelectSource,
+  onSelectStatus,
   selectedSourceKey,
+  selectedStatusKey,
 }) {
   return (
     <article className="message assistant-message">
@@ -326,6 +517,11 @@ function AssistantMessage({
         <div className="markdown">
           <ReactMarkdown>{message.text}</ReactMarkdown>
         </div>
+        <StatusResult
+          status={message.statusCard}
+          onSelectStatus={onSelectStatus}
+          isActive={selectedStatusKey === statusKey(message.statusCard)}
+        />
         <SourceList
           sources={message.sources}
           onSelectSource={onSelectSource}
@@ -337,11 +533,8 @@ function AssistantMessage({
 }
 
 function App() {
-  const [input, setInput] = useState('')
   const [role, setRole] = useState('requester')
-  const [messages, setMessages] = useState([])
-  const [isSending, setIsSending] = useState(false)
-  const [selectedSource, setSelectedSource] = useState(null)
+  const [roleSessions, setRoleSessions] = useState(createRoleSessions)
   const [sourcePanelPercent, setSourcePanelPercent] = useState(
     DEFAULT_SOURCE_PANEL_PERCENT,
   )
@@ -350,35 +543,72 @@ function App() {
   const isResizingSourceRef = useRef(false)
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
-  const sendInFlightRef = useRef(false)
+  const activeRoleRef = useRef(role)
+  const sendInFlightRef = useRef(
+    Object.fromEntries(roles.map(({ id }) => [id, false])),
+  )
+  const { input, messages, isSending, selectedSource, selectedStatus } =
+    roleSessions[role]
+  const hasDetailPanel = Boolean(selectedSource || selectedStatus)
+  const starters = startersByRole[role]
+
+  function setRoleSessionField(targetRole, field, nextValue) {
+    setRoleSessions((previous) => {
+      const currentSession = previous[targetRole]
+      const value =
+        typeof nextValue === 'function'
+          ? nextValue(currentSession[field])
+          : nextValue
+      return {
+        ...previous,
+        [targetRole]: {
+          ...currentSession,
+          [field]: value,
+        },
+      }
+    })
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, isSending])
 
   async function sendMessage(text = input) {
+    const requestRole = role
     const userText = text.trim()
-    if (!userText || sendInFlightRef.current) return
+    if (!userText || sendInFlightRef.current[requestRole]) return
 
-    const history = messages.slice(-6).map(({ sender, text: messageText }) => ({
-      role: sender,
-      text: messageText,
-    }))
+    const history = roleSessions[requestRole].messages
+      .slice(-6)
+      .map(({ sender, text: messageText }) => ({
+        role: sender,
+        text: messageText,
+      }))
 
-    setInput('')
-    setSelectedSource(null)
-    sendInFlightRef.current = true
-    setIsSending(true)
-    setMessages((previous) => [
-      ...previous,
-      { id: crypto.randomUUID(), sender: 'user', text: userText },
-    ])
+    sendInFlightRef.current[requestRole] = true
+    setRoleSessions((previous) => {
+      const currentSession = previous[requestRole]
+      return {
+        ...previous,
+        [requestRole]: {
+          ...currentSession,
+          input: '',
+          selectedSource: null,
+          selectedStatus: null,
+          isSending: true,
+          messages: [
+            ...currentSession.messages,
+            { id: crypto.randomUUID(), sender: 'user', text: userText },
+          ],
+        },
+      }
+    })
 
     try {
       const data = await fetchJson(CHAT_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, role, history }),
+        body: JSON.stringify({ message: userText, role: requestRole, history }),
       })
 
       if (typeof data.answer !== 'string' || !data.answer.trim()) {
@@ -386,20 +616,30 @@ function App() {
       }
 
       const sources = Array.isArray(data.sources) ? data.sources : []
+      const statusCard =
+        data.status_card && typeof data.status_card === 'object'
+          ? data.status_card
+          : null
 
-      setMessages((previous) => [
+      setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
           sender: 'assistant',
           text: data.answer,
           sources,
+          statusCard,
           requestId: data.request_id || '',
         },
       ])
-      setSelectedSource(sources[0] || null)
+      setRoleSessionField(
+        requestRole,
+        'selectedSource',
+        statusCard ? null : sources[0] || null,
+      )
+      setRoleSessionField(requestRole, 'selectedStatus', statusCard)
     } catch (error) {
-      setMessages((previous) => [
+      setRoleSessionField(requestRole, 'messages', (previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
@@ -409,12 +649,15 @@ function App() {
               ? `I could not connect to the assistant. ${error.message}`
               : 'I could not connect to the assistant. Please try again.',
           sources: [],
+          statusCard: null,
         },
       ])
     } finally {
-      sendInFlightRef.current = false
-      setIsSending(false)
-      inputRef.current?.focus()
+      sendInFlightRef.current[requestRole] = false
+      setRoleSessionField(requestRole, 'isSending', false)
+      if (activeRoleRef.current === requestRole) {
+        inputRef.current?.focus()
+      }
     }
   }
 
@@ -423,11 +666,33 @@ function App() {
     sendMessage()
   }
 
+  function handleNewChat() {
+    setRoleSessions((previous) => ({
+      ...previous,
+      [role]: createEmptyRoleSession(),
+    }))
+    setSourcePanelPercent(DEFAULT_SOURCE_PANEL_PERCENT)
+    inputRef.current?.focus()
+  }
+
+  function handleRoleChange(nextRole) {
+    activeRoleRef.current = nextRole
+    setRole(nextRole)
+  }
+
   function handleSelectSource(source) {
-    setSelectedSource((currentSource) =>
+    setRoleSessionField(role, 'selectedStatus', null)
+    setRoleSessionField(role, 'selectedSource', (currentSource) =>
       currentSource && sourceKey(currentSource) === sourceKey(source)
         ? null
         : source,
+    )
+  }
+
+  function handleSelectStatus(status) {
+    setRoleSessionField(role, 'selectedSource', null)
+    setRoleSessionField(role, 'selectedStatus', (currentStatus) =>
+      statusKey(currentStatus) === statusKey(status) ? null : status,
     )
   }
 
@@ -518,9 +783,9 @@ function App() {
       <main className="workspace">
         <section
           ref={assistantPanelRef}
-          className={`assistant-panel ${selectedSource ? 'has-source-panel' : ''} ${isResizingSource ? 'is-resizing-source' : ''}`}
+          className={`assistant-panel ${hasDetailPanel ? 'has-detail-panel' : ''} ${isResizingSource ? 'is-resizing-source' : ''}`}
           style={
-            selectedSource
+            hasDetailPanel
               ? { '--source-panel-width': `${sourcePanelPercent}%` }
               : undefined
           }
@@ -528,21 +793,34 @@ function App() {
         >
           <div className="assistant-main">
             <div className="role-bar">
-            <span className="role-label">I am a</span>
-            <div className="role-options" aria-label="Choose your role">
-              {roles.map(({ id, label, Icon }) => (
-                <button
-                  className={`role-option ${role === id ? 'is-active' : ''}`}
-                  type="button"
-                  key={id}
-                  onClick={() => setRole(id)}
-                  aria-pressed={role === id}
-                >
-                  <Icon size={16} aria-hidden="true" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
+              <button
+                className="new-chat-button"
+                type="button"
+                onClick={handleNewChat}
+                disabled={isSending}
+                aria-label="Start a new chat"
+                title="Start a new chat"
+              >
+                <Plus size={17} aria-hidden="true" />
+                <span className="new-chat-label">New chat</span>
+              </button>
+              <div className="role-controls">
+                <span className="role-label">I am a</span>
+                <div className="role-options" aria-label="Choose your role">
+                  {roles.map(({ id, label, Icon }) => (
+                    <button
+                      className={`role-option ${role === id ? 'is-active' : ''}`}
+                      type="button"
+                      key={id}
+                      onClick={() => handleRoleChange(id)}
+                      aria-pressed={role === id}
+                    >
+                      <Icon size={16} aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className={`conversation ${messages.length ? 'has-messages' : ''}`}>
@@ -576,9 +854,11 @@ function App() {
                       key={message.id}
                       message={message}
                       onSelectSource={handleSelectSource}
+                      onSelectStatus={handleSelectStatus}
                       selectedSourceKey={
                         selectedSource ? sourceKey(selectedSource) : ''
                       }
+                      selectedStatusKey={statusKey(selectedStatus)}
                     />
                   ) : (
                     <article className="message user-message" key={message.id}>
@@ -617,7 +897,9 @@ function App() {
                 value={input}
                 rows="1"
                 maxLength="4000"
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) =>
+                  setRoleSessionField(role, 'input', event.target.value)
+                }
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
@@ -638,19 +920,19 @@ function App() {
               </button>
             </div>
             <p className="scope-note">
-              Guidance only. This demo cannot access, submit, approve, or change
+              Guidance only. This assistant cannot access, submit, approve, or change
               live procurement records.
             </p>
             </form>
           </div>
 
-          {selectedSource && (
+          {hasDetailPanel && (
             <>
               <div
                 className="source-resizer"
                 role="separator"
                 tabIndex="0"
-                aria-label="Resize source panel"
+                aria-label={`Resize ${selectedStatus ? 'status' : 'source'} panel`}
                 aria-orientation="vertical"
                 aria-valuemin={Math.round(
                   (MIN_SOURCE_PANEL_WIDTH /
@@ -690,10 +972,21 @@ function App() {
                 }}
                 onKeyDown={handleResizeKeyDown}
               />
-              <SourcePanel
-                source={selectedSource}
-                onClose={() => setSelectedSource(null)}
-              />
+              {selectedStatus ? (
+                <StatusPanel
+                  status={selectedStatus}
+                  onClose={() =>
+                    setRoleSessionField(role, 'selectedStatus', null)
+                  }
+                />
+              ) : (
+                <SourcePanel
+                  source={selectedSource}
+                  onClose={() =>
+                    setRoleSessionField(role, 'selectedSource', null)
+                  }
+                />
+              )}
             </>
           )}
         </section>

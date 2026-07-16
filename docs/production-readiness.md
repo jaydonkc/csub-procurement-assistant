@@ -1,16 +1,16 @@
 # Agent Production Readiness
 
-Status: the public frontend, backend, and production agent behavior were verified end to end on July 15, 2026. Authenticated requester/vendor status workflows are not implemented. A CSUB-approved custom domain and governance choices remain external decisions.
+Status: the public frontend, backend, and production agent behavior were verified end to end on July 16, 2026. The production UI includes identifier-only `DEMO-*` status records; authenticated requester/vendor status workflows are not implemented. A CSUB-approved custom domain and governance choices remain external decisions.
 
 ## Frozen Runtime
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `14`
+- Version: `21`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Immediate predecessor: `13`; versions `10`-`14` retain conditional retrieval, grounded guidance, and expiring source links; version `8` retains the first document/video source-link implementation
+- Retained rollback versions: `18`-`20`; version `21` adds the deterministic `DEMO-*` status provider and automatic structured progress panel while retaining role-aware conversations, conditional retrieval, grounded guidance, and expiring source links
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -42,15 +42,20 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 
 1. Validate and bound the request body, role, message, and recent history.
 2. Apply deterministic capability, access, prompt-injection, and PII gates.
-3. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
-4. Return bounded natural language with no sources for non-retrieval turns.
-5. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
-6. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
-7. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
-8. Attempt one constrained correction; fail closed if the answer remains unsupported.
-9. Return only cited public source cards, optional 15-minute private source links, and privacy-preserving request metadata.
+3. Resolve exact `DEMO-*` identifiers through the deterministic status provider and return a structured status card without calling retrieval or a model.
+4. Route the remaining turn as conversation, clarification, out of scope, or retrieval; default to retrieval on invalid, unavailable, or uncertain router output.
+5. Return bounded natural language with no sources for non-retrieval turns; deterministic capability escalations direct users to `bwholgemuth1@csub.edu`.
+6. For retrieval turns, retrieve only public candidates and exclude internal metadata and known internal/admin paths.
+7. Use source-verified templates for high-frequency guided workflows or grounded model generation for other questions.
+8. Normalize citations, reject unknown citation IDs, verify citation coverage, and audit entailment, numeric operators, and source scope.
+9. Attempt one constrained correction; fail closed if the answer remains unsupported and provide the configured escalation contact.
+10. Return only cited public source cards, optional structured demo status, optional 15-minute private source links, and privacy-preserving request metadata.
 
-The frozen public agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording only and never authorize restricted content. Any requester/vendor status lookup added to the MVP must use authenticated read-only integration and backend authorization before returning personalized records.
+The frozen public agent cannot submit, approve, edit, withdraw, reject, or look up live transactions. It can return only the four packaged `DEMO-*` records through the deterministic status path. Self-reported roles affect wording and suggested questions only and never authorize restricted content. Public escalation responses direct users to `bwholgemuth1@csub.edu`. Any requester/vendor live status lookup added to the MVP must use authenticated read-only integration and backend authorization before returning personalized records.
+
+Production version `21` adds only records with explicit `DEMO-*` identifiers stored in the Lambda package. The identifier is the sole user-visible demo marker; answer text, panel labels, and field values otherwise use the production-shaped presentation. It is a demo of the future response shape, not authenticated status access and not a connection to CSUBUY. A real provider should sit behind a read-only tool boundary with identity and record-level authorization enforced independently of model output.
+
+The version `21` code passes 93/93 focused backend tests, including structured status responses, no-model/no-retrieval demo lookup, unknown-ID failure, mutation blocking, and preservation of the ordinary no-live-access boundary.
 
 ## Pydantic AI Development Refactor
 
@@ -62,7 +67,7 @@ The development implementation reorganizes the backend without changing the prod
 - Request classification, guided clarification, Knowledge Base retrieval, public-source filtering, source caps, source-verified workflow templates, and S3 URL signing remain deterministic application code.
 - Retrieval is performed before model execution and is not exposed as a model-optional tool.
 
-This Pydantic path is deployed to the frozen `production` alias. Its local suite passes 83/83 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites should be rerun before any future alias move.
+This Pydantic path is deployed to the frozen `production` alias. Its local suite passes 93/93 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, escalation routing, structured status routing, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites should be rerun before any future alias move.
 
 ## Acceptance Results
 
@@ -72,7 +77,8 @@ Final post-deployment run through API Gateway and WAF:
 - Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 9.215-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
 - Conditional retrieval/source-link live check: 9/9 routing scenarios passed; `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
-- Local policy/API suite: 78/78 passed.
+- Current focused local backend suite: 93/93 passed.
+- Production status-panel smoke check: `DEMO-INV-3001` returned the structured four-stage record through API Gateway and rendered automatically in CloudFront with no extra demo/synthetic labels; an ordinary invoice number still returned the no-live-access boundary.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 

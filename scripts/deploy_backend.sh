@@ -17,6 +17,7 @@ REVISION="${DEPLOYMENT_REVISION:-$(git rev-parse --short HEAD)-$(date -u +%Y%m%d
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_ROOT="$(mktemp -d)"
 PACKAGE_DIR="${BUILD_ROOT}/package"
+TEST_DEPENDENCY_DIR="${BUILD_ROOT}/test-dependencies"
 ZIP_FILE="${BUILD_ROOT}/lambda.zip"
 SMOKE_EVENT="${BUILD_ROOT}/smoke-event.json"
 SMOKE_OUTPUT="${BUILD_ROOT}/smoke-output.json"
@@ -30,19 +31,48 @@ CODE_UPDATE_OUTPUT="${BUILD_ROOT}/code-update.json"
 CONFIG_UPDATE_OUTPUT="${BUILD_ROOT}/configuration-update.json"
 ALIAS_UPDATE_OUTPUT="${BUILD_ROOT}/alias-update.json"
 FUNCTION_STATE_OUTPUT="${BUILD_ROOT}/function-state.json"
+LAMBDA_PLATFORM="${LAMBDA_PLATFORM:-manylinux2014_aarch64}"
+LAMBDA_PYTHON_VERSION="${LAMBDA_PYTHON_VERSION:-3.13}"
 
 cleanup() {
   rm -rf "${BUILD_ROOT}"
 }
 trap cleanup EXIT
 
-mkdir -p "${PACKAGE_DIR}"
+mkdir -p "${PACKAGE_DIR}" "${TEST_DEPENDENCY_DIR}"
 python3 -m pip install \
   --disable-pip-version-check \
   --quiet \
+  --target "${TEST_DEPENDENCY_DIR}" \
+  --requirement "${ROOT_DIR}/backend/lambda-requirements.txt"
+python3 -m pip install \
+  --disable-pip-version-check \
+  --quiet \
+  --platform "${LAMBDA_PLATFORM}" \
+  --implementation cp \
+  --python-version "${LAMBDA_PYTHON_VERSION}" \
+  --only-binary=:all: \
   --target "${PACKAGE_DIR}" \
   --requirement "${ROOT_DIR}/backend/lambda-requirements.txt"
 cp "${ROOT_DIR}/backend/lambda_function.py" "${PACKAGE_DIR}/lambda_function.py"
+mkdir -p "${PACKAGE_DIR}/backend"
+RUNTIME_MODULES=(
+  __init__.py
+  config.py
+  grounding.py
+  models.py
+  policy.py
+  pydantic_agent.py
+  retrieval.py
+  router.py
+  source_access.py
+  status_tool.py
+  ui.py
+  workflows.py
+)
+for module in "${RUNTIME_MODULES[@]}"; do
+  cp "${ROOT_DIR}/backend/${module}" "${PACKAGE_DIR}/backend/${module}"
+done
 
 ACCOUNT_ID="$(aws sts get-caller-identity \
   --profile "${PROFILE}" \
@@ -56,8 +86,26 @@ fi
 
 (
   cd "${ROOT_DIR}"
-  PYTHONPATH="${PACKAGE_DIR}:${ROOT_DIR}" python3 -m unittest backend/test_lambda_function.py
+  PYTHONPATH="${ROOT_DIR}:${TEST_DEPENDENCY_DIR}" python3 -m unittest backend/test_lambda_function.py
 )
+
+python3 - "${PACKAGE_DIR}" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+required = [
+    root / "lambda_function.py",
+    root / "backend" / "pydantic_agent.py",
+    root / "backend" / "status_tool.py",
+    root / "pydantic_ai",
+]
+missing = [str(path) for path in required if not path.exists()]
+if not list((root / "pydantic_core").glob("_pydantic_core*.so")):
+    missing.append("pydantic_core native extension")
+if missing:
+    raise SystemExit(f"Lambda package is incomplete: {', '.join(missing)}")
+PY
 
 (
   cd "${PACKAGE_DIR}"

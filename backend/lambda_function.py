@@ -15,9 +15,10 @@ from typing import Any
 import boto3
 from pydantic import ValidationError
 
-from backend import grounding, policy, retrieval, source_access, workflows
+from backend import grounding, policy, retrieval, source_access, status_tool, workflows
 from backend.config import (
     ALLOWED_ORIGIN,
+    ESCALATION_CONTACT,
     KNOWLEDGE_BASE_ID,
     MAX_BODY_BYTES,
     MAX_CHUNKS_PER_SOURCE,
@@ -30,7 +31,7 @@ from backend.config import (
 )
 from backend.models import ChatRequest, ChatResponse, RetrievalDecision
 from backend.pydantic_agent import GroundingFailure, ProcurementAgent
-from backend.router import retrieval_fallback
+from backend.router import deterministic_retrieval_decision, retrieval_fallback
 from backend.ui import INDEX_HTML
 
 
@@ -149,6 +150,9 @@ def _route_request(
     role: str,
     history: list[dict[str, str]],
 ) -> RetrievalDecision:
+    deterministic_decision = deterministic_retrieval_decision(message, history)
+    if deterministic_decision is not None:
+        return deterministic_decision
     try:
         decision = _pydantic_runtime().decide_retrieval(
             message=message,
@@ -193,10 +197,12 @@ def _chat_payload(
     answer: str,
     sources: list[dict[str, Any]],
     request_id: str,
+    status_card: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return ChatResponse(
         answer=answer,
         sources=sources,
+        status_card=status_card,
         request_id=request_id,
     ).model_dump(mode="json", exclude_none=True)
 
@@ -252,6 +258,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             )
             return response(200, _chat_payload(route["answer"], [], request_id))
 
+        status_result = status_tool.lookup_status(message, role)
+        if status_result:
+            _log(
+                "request_complete",
+                request_id,
+                route="status_tool",
+                status_outcome=status_result.outcome,
+                source_count=0,
+                grounding="synthetic_demo",
+            )
+            return response(
+                200,
+                _chat_payload(
+                    status_result.answer,
+                    [],
+                    request_id,
+                    status_result.status_card,
+                ),
+            )
+
         retrieval_decision = _route_request(message, role, history)
         if retrieval_decision.route != "retrieve":
             _log(
@@ -271,7 +297,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if not sources:
             answer = (
                 "I could not find an approved public source that supports a reliable answer, so I will not guess. "
-                "Please contact CSUB Procurement or the office responsible for this request."
+                f"{ESCALATION_CONTACT}"
             )
             _log(
                 "request_complete",
@@ -284,7 +310,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return response(200, _chat_payload(answer, [], request_id))
 
         guided_answer = workflows.guided_template_answer(
-            message, source_context, sources
+            message,
+            source_context,
+            sources,
+            resolved_query=retrieval_decision.search_query,
         )
         if guided_answer:
             answer, guided_sources = guided_answer
@@ -311,7 +340,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             fallback_sources = _sources_with_urls(sources[:3])
             fallback = (
                 "I found potentially relevant public sources, but I could not verify a fully grounded answer to this question, so I will not guess. "
-                "The closest source cards are listed below; contact CSUB Procurement or the responsible support office for confirmation."
+                f"The closest source cards are listed below. {ESCALATION_CONTACT}"
             )
             _log(
                 "request_complete",
