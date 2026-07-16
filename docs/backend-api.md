@@ -34,6 +34,7 @@ The API requires `message` and `role`. The message is limited to 4,000 character
       "kind": "document",
       "timestamp": null,
       "source_url": "https://short-lived-private-source-url",
+      "caption_url": null,
       "media_expires_in": 900
     }
   ],
@@ -70,7 +71,7 @@ Unknown or multiple demo identifiers fail closed without retrieval. Mutation req
 
 The rendered experience uses the `DEMO-*` record identifier as its only demo marker. User-facing answer text, status headings, field values, and badges do not add separate demo or synthetic labels.
 
-Public cited documents can include `source_url`; cited training videos can include both `source_url` and `media_url` plus a transcript `timestamp`. These are private S3 presigned links with `media_expires_in=900`, not permanent public URLs. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
+Public cited documents can include `source_url`; cited training videos can include `source_url`, `media_url`, and an English WebVTT `caption_url` plus a transcript `timestamp`. These are private S3 presigned links with `media_expires_in=900`, not permanent public URLs. Caption files are playback assets backed by the same approved transcript source used for retrieval. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
 
 ## Production Controls
 

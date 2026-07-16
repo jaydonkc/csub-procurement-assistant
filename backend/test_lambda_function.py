@@ -1,6 +1,7 @@
 import base64
 import json
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from backend import (
@@ -393,16 +394,28 @@ class SourceBoundaryTests(unittest.TestCase):
             "media/videos/Receiving/Creating a Receipt.mp4",
         )
 
+    def test_public_video_maps_to_approved_caption_object(self):
+        source = {
+            "kind": "video_transcript",
+            "path": "Receiving/Creating a Receipt.mp4",
+        }
+        self.assertEqual(
+            source_access.public_caption_object_key(source),
+            "approved/transcripts/Receiving/Creating a Receipt.vtt",
+        )
+
     def test_internal_video_never_maps_to_media_object(self):
         source = {
             "kind": "video_transcript",
             "path": "Approvals/Taking Action on Requisitions.mp4",
         }
         self.assertIsNone(source_access.public_video_object_key(source))
+        self.assertIsNone(source_access.public_caption_object_key(source))
 
     def test_document_never_maps_to_media_object(self):
         source = {"kind": "document", "path": "Receiving/Creating a Receipt.pdf"}
         self.assertIsNone(source_access.public_video_object_key(source))
+        self.assertIsNone(source_access.public_caption_object_key(source))
 
     def test_public_document_maps_to_private_source_object(self):
         source = {
@@ -439,7 +452,10 @@ class SourceBoundaryTests(unittest.TestCase):
             "timestamp": "00:00:06.440 --> 00:01:11.440",
         }
         fake_s3 = unittest.mock.Mock()
-        fake_s3.generate_presigned_url.return_value = "https://media.example/receipt"
+        fake_s3.generate_presigned_url.side_effect = [
+            "https://media.example/receipt",
+            "https://media.example/receipt-captions",
+        ]
         enriched = source_access.sources_with_urls(
             [source],
             s3_client=fake_s3,
@@ -450,15 +466,87 @@ class SourceBoundaryTests(unittest.TestCase):
         self.assertNotIn("media_url", source)
         self.assertEqual(enriched[0]["source_url"], "https://media.example/receipt")
         self.assertEqual(enriched[0]["media_url"], "https://media.example/receipt")
+        self.assertEqual(
+            enriched[0]["caption_url"],
+            "https://media.example/receipt-captions",
+        )
         self.assertEqual(enriched[0]["media_expires_in"], MEDIA_URL_TTL_SECONDS)
-        fake_s3.generate_presigned_url.assert_called_once_with(
-            "get_object",
-            Params={
-                "Bucket": SOURCE_BUCKET,
-                "Key": "media/videos/Receiving/Creating a Receipt.mp4",
-                "ResponseContentType": "video/mp4",
+        fake_s3.generate_presigned_url.assert_has_calls(
+            [
+                unittest.mock.call(
+                    "get_object",
+                    Params={
+                        "Bucket": SOURCE_BUCKET,
+                        "Key": "media/videos/Receiving/Creating a Receipt.mp4",
+                        "ResponseContentType": "video/mp4",
+                    },
+                    ExpiresIn=MEDIA_URL_TTL_SECONDS,
+                ),
+                unittest.mock.call(
+                    "get_object",
+                    Params={
+                        "Bucket": SOURCE_BUCKET,
+                        "Key": "approved/transcripts/Receiving/Creating a Receipt.vtt",
+                        "ResponseContentType": "text/vtt",
+                    },
+                    ExpiresIn=MEDIA_URL_TTL_SECONDS,
+                ),
+            ]
+        )
+
+    def test_caption_signing_failure_does_not_remove_video_url(self):
+        source = {
+            "id": "S1",
+            "kind": "video_transcript",
+            "path": "Receiving/Creating a Receipt.mp4",
+        }
+        fake_s3 = unittest.mock.Mock()
+        fake_s3.generate_presigned_url.side_effect = [
+            "https://media.example/receipt",
+            ValueError("caption missing"),
+        ]
+
+        enriched = source_access.sources_with_urls(
+            [source],
+            s3_client=fake_s3,
+            source_bucket=SOURCE_BUCKET,
+            ttl_seconds=MEDIA_URL_TTL_SECONDS,
+        )
+
+        self.assertEqual(enriched[0]["media_url"], "https://media.example/receipt")
+        self.assertNotIn("caption_url", enriched[0])
+
+    def test_public_media_policy_pairs_every_video_with_a_caption(self):
+        policy_path = Path(__file__).parents[1] / "infra/public-training-video-policy.json"
+        statements = json.loads(policy_path.read_text(encoding="utf-8"))["Statement"]
+        resources = {
+            resource
+            for statement in statements
+            for resource in statement.get("Resource", [])
+        }
+        videos = {resource for resource in resources if resource.endswith(".mp4")}
+        captions = {resource for resource in resources if resource.endswith(".vtt")}
+
+        expected_captions = {
+            resource.replace("/media/videos/", "/approved/transcripts/")[:-4]
+            + ".vtt"
+            for resource in videos
+        }
+        self.assertEqual(captions, expected_captions)
+
+    def test_source_cors_allows_only_read_only_supported_origins(self):
+        cors_path = Path(__file__).parents[1] / "infra/public-source-cors.json"
+        rules = json.loads(cors_path.read_text(encoding="utf-8"))["CORSRules"]
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(set(rules[0]["AllowedMethods"]), {"GET", "HEAD"})
+        self.assertEqual(
+            set(rules[0]["AllowedOrigins"]),
+            {
+                "https://d3s79ehfkh7xjx.cloudfront.net",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
             },
-            ExpiresIn=MEDIA_URL_TTL_SECONDS,
         )
 
     def test_public_document_source_gets_short_lived_source_url(self):

@@ -79,6 +79,7 @@ class SourceCard(BaseModel):
     timestamp: str | None = None
     source_url: str | None = None
     media_url: str | None = None
+    caption_url: str | None = None
     media_expires_in: int | None = None
 
 

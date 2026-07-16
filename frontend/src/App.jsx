@@ -278,6 +278,9 @@ function SourcePanel({ source, onClose }) {
   const range = parseTimestampRange(source.timestamp)
   const videoSource = isVideoSource(source)
   const videoUrl = playbackUrl(source, range)
+  const [captionState, setCaptionState] = useState(
+    source.caption_url ? 'loading' : 'missing',
+  )
   const externalUrl = videoSource
     ? videoUrl
     : source.source_url || source.media_url || ''
@@ -289,6 +292,11 @@ function SourcePanel({ source, onClose }) {
       ? Math.max(player.duration - 0.01, 0)
       : range.start
     player.currentTime = Math.min(range.start, lastSeekableSecond)
+  }
+
+  function showCaptions(event) {
+    event.currentTarget.track.mode = 'showing'
+    setCaptionState('ready')
   }
 
   return (
@@ -330,19 +338,39 @@ function SourcePanel({ source, onClose }) {
             {videoUrl ? (
               <video
                 className="source-video"
-                key={videoUrl}
+                key={`${videoUrl}-${source.caption_url || ''}`}
+                crossOrigin={source.caption_url ? 'anonymous' : undefined}
                 src={videoUrl}
                 controls
                 playsInline
                 preload="metadata"
                 onLoadedMetadata={preloadTimestamp}
                 aria-label={`Video source: ${sourceName(source.path)}`}
-              />
+              >
+                {source.caption_url && (
+                  <track
+                    kind="captions"
+                    src={source.caption_url}
+                    srcLang="en"
+                    label="English"
+                    default
+                    onLoad={showCaptions}
+                    onError={() => setCaptionState('error')}
+                  />
+                )}
+              </video>
             ) : (
               <div className="video-unavailable">
                 <FileVideo2 size={28} aria-hidden="true" />
                 <span>Video preview is unavailable.</span>
               </div>
+            )}
+
+            {videoUrl && ['missing', 'error'].includes(captionState) && (
+              <p className="caption-status" role="status">
+                Closed captions are temporarily unavailable. The cited answer
+                provides a readable transcript summary.
+              </p>
             )}
 
             {range.start !== null && (
@@ -981,6 +1009,7 @@ function App() {
                 />
               ) : (
                 <SourcePanel
+                  key={`${sourceKey(selectedSource)}-${selectedSource.caption_url || ''}`}
                   source={selectedSource}
                   onClose={() =>
                     setRoleSessionField(role, 'selectedSource', null)

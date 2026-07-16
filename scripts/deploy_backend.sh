@@ -6,6 +6,7 @@ REGION="${AWS_REGION:-us-west-2}"
 EXPECTED_ACCOUNT_ID="${AWS_ACCOUNT_ID:-335010339891}"
 STACK_NAME="${STACK_NAME:-csub-pa-production-backend}"
 FUNCTION_NAME="${FUNCTION_NAME:-csub-pa-mvp-chat-test}"
+SOURCE_BUCKET="${SOURCE_BUCKET:-csub-pa-mvp-source-335010339891-us-west-2}"
 ALIAS_NAME="${ALIAS_NAME:-production}"
 LAMBDA_EXECUTION_ROLE_NAME="${LAMBDA_EXECUTION_ROLE_NAME:-AmazonBedrockExecutionRoleForLambda_csub_pa_mvp_chat_test}"
 PUBLIC_VIDEO_POLICY_NAME="${PUBLIC_VIDEO_POLICY_NAME:-ServePublicCsubTrainingVideos}"
@@ -137,6 +138,13 @@ aws iam put-role-policy \
   --role-name "${LAMBDA_EXECUTION_ROLE_NAME}" \
   --policy-name "${PUBLIC_DOCUMENT_POLICY_NAME}" \
   --policy-document "file://${ROOT_DIR}/infra/public-source-document-policy.json"
+
+# Native video captions are fetched by the browser from short-lived S3 URLs.
+aws s3api put-bucket-cors \
+  --profile "${PROFILE}" \
+  --region "${REGION}" \
+  --bucket "${SOURCE_BUCKET}" \
+  --cors-configuration "file://${ROOT_DIR}/infra/public-source-cors.json"
 
 aws cloudformation deploy \
   --profile "${PROFILE}" \

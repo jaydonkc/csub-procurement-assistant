@@ -78,6 +78,17 @@ def public_video_object_key(source: dict[str, Any]) -> str | None:
     return f"media/videos/{path}"
 
 
+def public_caption_object_key(source: dict[str, Any]) -> str | None:
+    """Map a cited public video to its approved canonical WebVTT object."""
+    video_key = public_video_object_key(source)
+    if not video_key:
+        return None
+    path = _public_source_path(source)
+    if not path:
+        return None
+    return f"approved/transcripts/{path[:-4]}.vtt"
+
+
 def public_document_object_key(source: dict[str, Any]) -> tuple[str, str] | None:
     """Map a cited public document to its private S3 object and content type."""
     path = _public_source_path(source)
@@ -93,6 +104,28 @@ def public_document_object_key(source: dict[str, Any]) -> tuple[str, str] | None
     return f"approved/documents/{path}", DOCUMENT_CONTENT_TYPES[extension]
 
 
+def _presigned_source_url(
+    *,
+    s3_client: Any,
+    source_bucket: str,
+    object_key: str,
+    content_type: str,
+    ttl_seconds: int,
+) -> str | None:
+    try:
+        return s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": source_bucket,
+                "Key": object_key,
+                "ResponseContentType": content_type,
+            },
+            ExpiresIn=ttl_seconds,
+        )
+    except (BotoCoreError, ClientError, ValueError):
+        return None
+
+
 def sources_with_urls(
     sources: list[dict[str, Any]],
     *,
@@ -104,29 +137,47 @@ def sources_with_urls(
     enriched_sources = []
     for source in sources:
         enriched = dict(source)
-        object_key = public_video_object_key(enriched)
-        content_type = "video/mp4"
-        if not object_key:
+        video_key = public_video_object_key(enriched)
+        if video_key:
+            source_url = _presigned_source_url(
+                s3_client=s3_client,
+                source_bucket=source_bucket,
+                object_key=video_key,
+                content_type="video/mp4",
+                ttl_seconds=ttl_seconds,
+            )
+            caption_key = public_caption_object_key(enriched)
+            caption_url = (
+                _presigned_source_url(
+                    s3_client=s3_client,
+                    source_bucket=source_bucket,
+                    object_key=caption_key,
+                    content_type="text/vtt",
+                    ttl_seconds=ttl_seconds,
+                )
+                if caption_key
+                else None
+            )
+            if source_url:
+                enriched["source_url"] = source_url
+                enriched["media_url"] = source_url
+            if caption_url:
+                enriched["caption_url"] = caption_url
+            if source_url or caption_url:
+                enriched["media_expires_in"] = ttl_seconds
+        else:
             document_object = public_document_object_key(enriched)
             if document_object:
                 object_key, content_type = document_object
-        if object_key and content_type:
-            try:
-                source_url = s3_client.generate_presigned_url(
-                    "get_object",
-                    Params={
-                        "Bucket": source_bucket,
-                        "Key": object_key,
-                        "ResponseContentType": content_type,
-                    },
-                    ExpiresIn=ttl_seconds,
+                source_url = _presigned_source_url(
+                    s3_client=s3_client,
+                    source_bucket=source_bucket,
+                    object_key=object_key,
+                    content_type=content_type,
+                    ttl_seconds=ttl_seconds,
                 )
-                enriched["source_url"] = source_url
-                if content_type == "video/mp4":
-                    enriched["media_url"] = source_url
-                enriched["media_expires_in"] = ttl_seconds
-            except (BotoCoreError, ClientError, ValueError):
-                # A source-signing failure must not prevent the grounded answer.
-                pass
+                if source_url:
+                    enriched["source_url"] = source_url
+                    enriched["media_expires_in"] = ttl_seconds
         enriched_sources.append(enriched)
     return enriched_sources

@@ -1,0 +1,20 @@
+{
+  "replacements": [
+    {
+      "pattern": "\\bCSU\\s+(?:buy|by|b(?:i|u)?)\\b|\\bCSUBI\\b",
+      "replacement": "CSUBUY"
+    },
+    {
+      "pattern": "\\b(?:Jagger|Jaguar)\\b",
+      "replacement": "JAGGAER"
+    },
+    {
+      "pattern": "\\bservice\\s+now\\b",
+      "replacement": "ServiceNow"
+    },
+    {
+      "pattern": "\\bP\\s*(?:2|to|two)\\s*P\\b",
+      "replacement": "P2P"
+    }
+  ]
+}

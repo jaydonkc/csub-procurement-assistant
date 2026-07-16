@@ -18,6 +18,24 @@
         "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Shopping and Requistions/Submitting a Change Request (CSU10_POChangeRequest_V2).mp4",
         "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/media/videos/Suppliers/Request a New Supplier.mp4"
       ]
+    },
+    {
+      "Sid": "ReadPublicTrainingCaptions",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Fiscal Year End/2026 Fiscal Year End Process Training.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Getting Started/User Profile Update.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Getting Started/Using Comments.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Procurement/Updating PO Payment Terms.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Receiving/Creating a Receipt.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Search, Data Exports, Reports, & Support Tickets/Search for Requisitions (CSU08_SearchRequisition).vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Search, Data Exports, Reports, & Support Tickets/Searching in CSUBUY (CSU02_BasicAdvancedSearching).vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Shopping and Requistions/Shop Using a Form.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Shopping and Requistions/Shop Using a Punchout Catalog.vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Shopping and Requistions/Submitting a Change Request (CSU10_POChangeRequest_V2).vtt",
+        "arn:aws:s3:::csub-pa-mvp-source-335010339891-us-west-2/approved/transcripts/Suppliers/Request a New Supplier.vtt"
+      ]
     }
   ]
 }
