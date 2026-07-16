@@ -385,16 +385,19 @@ function App() {
         throw new Error('The assistant returned an empty response.')
       }
 
+      const sources = Array.isArray(data.sources) ? data.sources : []
+
       setMessages((previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
           sender: 'assistant',
           text: data.answer,
-          sources: data.sources || [],
+          sources,
           requestId: data.request_id || '',
         },
       ])
+      setSelectedSource(sources[0] || null)
     } catch (error) {
       setMessages((previous) => [
         ...previous,
