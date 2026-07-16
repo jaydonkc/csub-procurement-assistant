@@ -49,7 +49,7 @@ The `codex/demo-status-panel` development branch recognizes one exact synthetic 
 
 ```json
 {
-  "answer": "I found the synthetic invoice DEMO-INV-3001.",
+  "answer": "I found the invoice DEMO-INV-3001.",
   "sources": [],
   "status_card": {
     "record_id": "DEMO-INV-3001",
@@ -60,14 +60,15 @@ The `codex/demo-status-panel` development branch recognizes one exact synthetic 
     "stages": ["Invoice received", "AP review", "Payment scheduled", "Paid"],
     "fields": [{"label": "Invoice total", "value": "$2,480.00"}],
     "next_step": "Accounts Payable completes its review before the payment can be scheduled.",
-    "last_updated": "July 16, 2026 at 11:40 AM",
-    "is_demo": true
+    "last_updated": "July 16, 2026 at 11:40 AM"
   },
   "request_id": "example-request-id"
 }
 ```
 
 Unknown or multiple demo identifiers fail closed without retrieval. Mutation requests remain blocked. Ordinary record numbers still return the no-live-access boundary. This optional response field is implemented on the development branch and is not part of the currently frozen Lambda version `18` until a later deployment is explicitly approved.
+
+The rendered experience uses the `DEMO-*` record identifier as its only demo marker. User-facing answer text, status headings, field values, and badges do not add separate demo or synthetic labels.
 
 Public cited documents can include `source_url`; cited training videos can include both `source_url` and `media_url` plus a transcript `timestamp`. These are private S3 presigned links with `media_expires_in=900`, not permanent public URLs. Invalid input returns `400`, unknown routes return `404`, throttled traffic returns `429`, oversized traffic returns `413`, and unexpected backend failures return a generic `500` without internal error details.
 

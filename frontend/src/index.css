@@ -714,22 +714,6 @@ button {
   align-items: center;
 }
 
-.demo-pill {
-  min-height: 27px;
-  padding: 4px 8px;
-  display: inline-flex;
-  align-items: center;
-  color: #624d0c;
-  background: #fff3c4;
-  border: 1px solid #e0c25d;
-  border-radius: 999px;
-  font-family: "Oswald", Arial, sans-serif;
-  font-size: 0.64rem;
-  font-weight: 750;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .status-panel-body {
   display: grid;
   align-content: start;
@@ -935,27 +919,6 @@ button {
   margin: 5px 0 0;
   font-size: 0.76rem;
   line-height: 1.55;
-}
-
-.status-demo-note {
-  padding-top: 14px;
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  color: #717c8c;
-  border-top: 1px solid var(--line);
-}
-
-.status-demo-note svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: var(--csub-blue);
-}
-
-.status-demo-note p {
-  margin: 0;
-  font-size: 0.68rem;
-  line-height: 1.5;
 }
 
 .source-video,

@@ -205,8 +205,8 @@ class DemoStatusToolTests(unittest.TestCase):
         self.assertEqual(payload["status_card"]["record_id"], "DEMO-INV-3001")
         self.assertEqual(payload["status_card"]["current_stage"], 2)
         self.assertEqual(len(payload["status_card"]["stages"]), 4)
-        self.assertTrue(payload["status_card"]["is_demo"])
         self.assertIn("Accounts Payable review", payload["answer"])
+        self.assertNotIn("synthetic", result["body"].casefold())
 
     def test_demo_identifier_matching_is_case_insensitive(self):
         result = status_tool.lookup_status("show demo-po-2001", "requester")
@@ -257,11 +257,17 @@ class DemoStatusToolTests(unittest.TestCase):
         )
         self.assertEqual(route["route"], "live_lookup")
 
-    def test_demo_records_contain_no_sensitive_identity_fields(self):
+    def test_demo_records_contain_no_sensitive_or_explicit_demo_fields(self):
         forbidden_labels = {"ssn", "bank account", "routing number", "email"}
         for record in status_tool.DEMO_RECORDS.values():
             labels = {field["label"].casefold() for field in record["fields"]}
             self.assertTrue(labels.isdisjoint(forbidden_labels))
+            visible_values = " ".join(
+                [record["title"], record["status"]]
+                + [field["value"] for field in record["fields"]]
+            ).casefold()
+            self.assertNotIn("synthetic", visible_values)
+            self.assertNotIn("demo", visible_values)
 
 
 class SourceBoundaryTests(unittest.TestCase):

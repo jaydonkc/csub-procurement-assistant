@@ -7,7 +7,6 @@ import {
   Clock3,
   CirclePlay,
   ClipboardList,
-  Database,
   ExternalLink,
   FileText,
   FileVideo2,
@@ -412,11 +411,10 @@ function StatusPanel({ status, onClose }) {
     >
       <div className="source-panel-header status-panel-header">
         <div>
-          <span className="source-kicker">Demo status</span>
+          <span className="source-kicker">Status</span>
           <h2 id="status-panel-title">{status.record_id}</h2>
         </div>
         <div className="source-panel-actions">
-          <span className="demo-pill">Synthetic</span>
           <button
             className="source-close"
             type="button"
@@ -487,13 +485,6 @@ function StatusPanel({ status, onClose }) {
           <p>{status.next_step}</p>
         </section>
 
-        <div className="status-demo-note">
-          <Database size={17} aria-hidden="true" />
-          <p>
-            Synthetic demonstration record. It is not connected to CSUBUY or
-            any live CSUB system.
-          </p>
-        </div>
       </div>
     </aside>
   )
@@ -919,7 +910,7 @@ function App() {
               </button>
             </div>
             <p className="scope-note">
-              Guidance only. This demo cannot access, submit, approve, or change
+              Guidance only. This assistant cannot access, submit, approve, or change
               live procurement records.
             </p>
             </form>

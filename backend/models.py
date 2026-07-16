@@ -103,8 +103,6 @@ class StatusCard(BaseModel):
     fields: list[StatusField] = Field(min_length=1, max_length=8)
     next_step: str = Field(min_length=1, max_length=400)
     last_updated: str = Field(min_length=1, max_length=120)
-    is_demo: bool = True
-
     @model_validator(mode="after")
     def current_stage_exists(self) -> "StatusCard":
         if self.current_stage > len(self.stages):

@@ -53,7 +53,7 @@ API Gateway invokes only the immutable `production` alias. The `$LATEST` and ali
 
 The frozen public agent cannot submit, approve, edit, withdraw, reject, or look up transactions. Self-reported roles affect wording and suggested questions only and never authorize restricted content. Public escalation responses direct users to `bwholgemuth1@csub.edu`. Any requester/vendor status lookup added to the MVP must use authenticated read-only integration and backend authorization before returning personalized records.
 
-The `codex/demo-status-panel` branch adds only unmistakably synthetic records stored in the Lambda package. It is a demo of the future response shape, not authenticated status access and not a connection to CSUBUY. A real provider should sit behind a read-only tool boundary with identity and record-level authorization enforced independently of model output.
+The `codex/demo-status-panel` branch adds only records with explicit `DEMO-*` identifiers stored in the Lambda package. The identifier is the sole user-visible demo marker; answer text, panel labels, and field values otherwise use the production-shaped presentation. It is a demo of the future response shape, not authenticated status access and not a connection to CSUBUY. A real provider should sit behind a read-only tool boundary with identity and record-level authorization enforced independently of model output.
 
 The development branch passes 93/93 focused backend tests, including structured status responses, no-model/no-retrieval demo lookup, unknown-ID failure, mutation blocking, and preservation of the ordinary no-live-access boundary. This count is separate from the frozen version `18` acceptance record below.
 

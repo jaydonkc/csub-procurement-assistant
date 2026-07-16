@@ -34,8 +34,8 @@ DEMO_RECORDS: dict[str, dict[str, Any]] = {
         ],
         "fields": [
             {"label": "Amount", "value": "$2,480.00"},
-            {"label": "Supplier", "value": "Demo Technology Supply"},
-            {"label": "Department", "value": "Academic Affairs (demo)"},
+            {"label": "Supplier", "value": "Technology Supply Co."},
+            {"label": "Department", "value": "Academic Affairs"},
             {"label": "Submitted", "value": "July 14, 2026"},
         ],
         "next_step": "The department approver reviews the requisition before it can continue to Procurement.",
@@ -54,9 +54,9 @@ DEMO_RECORDS: dict[str, dict[str, Any]] = {
         ],
         "fields": [
             {"label": "Amount", "value": "$1,275.40"},
-            {"label": "Supplier", "value": "Demo Lab Supply Co."},
+            {"label": "Supplier", "value": "Lab Supply Co."},
             {"label": "Delivery", "value": "July 22, 2026"},
-            {"label": "Related requisition", "value": "REQ-1002 (synthetic)"},
+            {"label": "Related requisition", "value": "REQ-1002"},
         ],
         "next_step": "The supplier fulfills the order; the requester records receipt after delivery when required.",
         "last_updated": "July 16, 2026 at 10:05 AM",
@@ -74,8 +74,8 @@ DEMO_RECORDS: dict[str, dict[str, Any]] = {
         ],
         "fields": [
             {"label": "Invoice total", "value": "$2,480.00"},
-            {"label": "Supplier", "value": "Demo Technology Supply"},
-            {"label": "Purchase order", "value": "PO-2003 (synthetic)"},
+            {"label": "Supplier", "value": "Technology Supply Co."},
+            {"label": "Purchase order", "value": "PO-2003"},
             {"label": "Invoice date", "value": "July 11, 2026"},
         ],
         "next_step": "Accounts Payable completes its review before the payment can be scheduled.",
@@ -83,7 +83,7 @@ DEMO_RECORDS: dict[str, dict[str, Any]] = {
     },
     "DEMO-VCH-4002": {
         "record_type": "Voucher",
-        "title": "Completed payment example",
+        "title": "Completed payment",
         "status": "Paid",
         "current_stage": 4,
         "stages": [
@@ -94,8 +94,8 @@ DEMO_RECORDS: dict[str, dict[str, Any]] = {
         ],
         "fields": [
             {"label": "Payment amount", "value": "$845.75"},
-            {"label": "Supplier", "value": "Demo Office Products"},
-            {"label": "Payment method", "value": "ACH (demo)"},
+            {"label": "Supplier", "value": "Office Products Co."},
+            {"label": "Payment method", "value": "ACH"},
             {"label": "Paid date", "value": "July 15, 2026"},
         ],
         "next_step": "No action is required for this completed demonstration record.",
@@ -143,7 +143,7 @@ def lookup_status(message: str, role: str) -> StatusToolResult | None:
     if len(demo_ids) > 1:
         return StatusToolResult(
             answer=(
-                "I found more than one synthetic identifier. Enter one `DEMO-*` "
+                "I found more than one identifier. Enter one `DEMO-*` "
                 "identifier at a time so I can show one status record."
             ),
             status_card=None,
@@ -156,7 +156,7 @@ def lookup_status(message: str, role: str) -> StatusToolResult | None:
         examples = ", ".join(f"`{value}`" for value in DEMO_RECORDS)
         return StatusToolResult(
             answer=(
-                f"I could not find `{record_id}` in the synthetic demonstration data. "
+                f"I could not find `{record_id}`. "
                 f"Try {examples}. No live procurement system was queried."
             ),
             status_card=None,
@@ -173,11 +173,10 @@ def lookup_status(message: str, role: str) -> StatusToolResult | None:
         "fields": record["fields"],
         "next_step": record["next_step"],
         "last_updated": record["last_updated"],
-        "is_demo": True,
     }
     return StatusToolResult(
         answer=(
-            f"I found the synthetic {record['record_type'].lower()} `{record_id}`. "
+            f"I found the {record['record_type'].lower()} `{record_id}`. "
             f"Its current status is **{record['status']}**. I opened the status details on the right."
         ),
         status_card=status_card,
