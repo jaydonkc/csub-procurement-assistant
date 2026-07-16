@@ -96,7 +96,7 @@ button {
 
 .workspace {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
   flex: 1;
@@ -478,7 +478,49 @@ button {
   flex-direction: column;
   overflow: hidden;
   background: var(--white);
+}
+
+.source-resizer {
+  position: relative;
+  z-index: 2;
+  width: 9px;
+  height: 100%;
+  align-self: stretch;
+  background: #f5f7fa;
+  border-right: 1px solid var(--line);
   border-left: 1px solid var(--line);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.source-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.source-resizer:hover::after,
+.source-resizer:focus-visible::after,
+.is-resizing-source .source-resizer::after {
+  background: var(--csub-blue);
+}
+
+.source-resizer:focus-visible {
+  outline: 3px solid rgba(0, 53, 148, 0.3);
+  outline-offset: -3px;
+}
+
+.is-resizing-source,
+.is-resizing-source * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.is-resizing-source .source-pdf,
+.is-resizing-source .source-video {
+  pointer-events: none;
 }
 
 .source-panel-header {
@@ -621,6 +663,16 @@ button {
   border-radius: 6px;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.source-pdf {
+  width: 100%;
+  min-height: 380px;
+  height: min(62vh, 620px);
+  display: block;
+  background: #f2f5fa;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .source-details {
@@ -774,7 +826,10 @@ a:focus-visible {
 
 .assistant-panel.has-source-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 38%, 380px);
+  grid-template-columns:
+    minmax(320px, 1fr)
+    9px
+    minmax(280px, var(--source-panel-width, 42%));
 }
 
 @media (max-width: 720px) {
@@ -875,6 +930,10 @@ a:focus-visible {
   .assistant-panel.has-source-panel .source-panel {
     width: 100%;
     border-left: 0;
+  }
+
+  .assistant-panel.has-source-panel .source-resizer {
+    display: none;
   }
 }
 
