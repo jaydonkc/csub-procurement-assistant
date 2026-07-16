@@ -682,7 +682,7 @@ button {
 }
 
 .source-details span {
-  color: #727c8a;
+  color: var(--muted);
   font-family: "Oswald", Arial, sans-serif;
   font-size: 0.7rem;
   font-weight: 700;
@@ -764,8 +764,16 @@ button {
   line-height: 1.45;
 }
 
+.composer textarea:focus,
+.composer textarea:focus-visible,
+.composer textarea:active {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
 .composer textarea::placeholder {
-  color: #7d8694;
+  color: var(--muted);
 }
 
 .send-button {
@@ -798,7 +806,7 @@ button {
 .scope-note {
   width: min(820px, 100%);
   margin: 7px auto 0;
-  color: #747d8b;
+  color: var(--muted);
   font-size: 0.69rem;
   line-height: 1.35;
   text-align: center;
