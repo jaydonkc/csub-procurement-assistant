@@ -764,6 +764,14 @@ button {
   line-height: 1.45;
 }
 
+.composer textarea:focus,
+.composer textarea:focus-visible,
+.composer textarea:active {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
 .composer textarea::placeholder {
   color: #7d8694;
 }
