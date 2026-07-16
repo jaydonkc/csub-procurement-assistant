@@ -31,7 +31,7 @@ from backend.config import (
 )
 from backend.models import ChatRequest, ChatResponse, RetrievalDecision
 from backend.pydantic_agent import GroundingFailure, ProcurementAgent
-from backend.router import retrieval_fallback
+from backend.router import deterministic_retrieval_decision, retrieval_fallback
 from backend.ui import INDEX_HTML
 
 
@@ -150,6 +150,9 @@ def _route_request(
     role: str,
     history: list[dict[str, str]],
 ) -> RetrievalDecision:
+    deterministic_decision = deterministic_retrieval_decision(message, history)
+    if deterministic_decision is not None:
+        return deterministic_decision
     try:
         decision = _pydantic_runtime().decide_retrieval(
             message=message,
@@ -307,7 +310,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return response(200, _chat_payload(answer, [], request_id))
 
         guided_answer = workflows.guided_template_answer(
-            message, source_context, sources
+            message,
+            source_context,
+            sources,
+            resolved_query=retrieval_decision.search_query,
         )
         if guided_answer:
             answer, guided_sources = guided_answer

@@ -116,9 +116,19 @@ uv pip install --python .venv/bin/python -r requirements.txt
 ruff check backend
 npm --prefix frontend run lint
 npm --prefix frontend run build
+.venv/bin/python scripts/run_response_evals.py --dry-run
 ```
 
 Build Lambda dependencies for its Linux ARM64 runtime; do not deploy packages copied from the local macOS virtual environment.
+
+Run the JSON-driven live response suite with:
+
+```bash
+.venv/bin/python scripts/run_response_evals.py \
+  --output outputs/response-evals/production.json
+```
+
+See [evals/README.md](evals/README.md) for scenario filters, assertion semantics, and alternate endpoints.
 
 ## MVP Differentiators
 

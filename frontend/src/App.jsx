@@ -166,6 +166,14 @@ function formatPlaybackTime(seconds) {
     : `${minutes}:${String(remainder).padStart(2, '0')}`
 }
 
+function formatTimestampRange(timestamp) {
+  const range = parseTimestampRange(timestamp)
+  if (range.start === null) return timestamp
+  const start = formatPlaybackTime(range.start)
+  const end = range.end === null ? '' : ` --> ${formatPlaybackTime(range.end)}`
+  return `${start}${end}`
+}
+
 function playbackUrl(source, range) {
   const sourceUrl = source.source_url || source.media_url
   if (!sourceUrl) return ''
@@ -235,7 +243,9 @@ function SourceList({ sources, onSelectSource, selectedSourceKey }) {
                   <span className="source-name">{sourceName(source.path)}</span>
                 </span>
                 {source.timestamp && (
-                  <span className="source-time">{source.timestamp}</span>
+                  <span className="source-time">
+                    {formatTimestampRange(source.timestamp)}
+                  </span>
                 )}
               </span>
               {videoSource ? (

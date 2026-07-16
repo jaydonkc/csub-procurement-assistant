@@ -1,4 +1,5 @@
 outputs/
+/tmp/
 .DS_Store
 .env
 aws/

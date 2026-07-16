@@ -10,9 +10,39 @@ from backend.source_access import is_public_source
 
 QUERY_EXPANSIONS = (
     (
+        ("invoice",),
+        ("information", "include", "requirement", "required"),
+        "CSUB invoice itemized match PO Direct Pay supplier invoice date number Accounts Payable",
+    ),
+    (
+        ("supplier", "vendor"),
+        ("invitation", "invite", "re-invite", "reinvite"),
+        "Supplier Did Not Receive Invitation invited email Re-Invite Request jaggaer.com",
+    ),
+    (
         ("supplier", "vendor"),
         ("search", "find", "registered", "active"),
         "Supplier Search Tips CSUBUY supplier search registered active invitation",
+    ),
+    (
+        ("amazon",),
+        tuple(),
+        "Amazon Accounts and Access CSUBUY Amazon Business email punchout",
+    ),
+    (
+        ("voucher",),
+        ("pay status", "payment status", "status"),
+        "Voucher Pay Status Orders Search Vouchers Payment Information",
+    ),
+    (
+        ("supplier", "vendor"),
+        ("registration returned", "returned for correction"),
+        "Supplier Registration Returned correction reason SM Team noreply jaggaer resources",
+    ),
+    (
+        ("change request",),
+        ("purchase order", "po", "cfs", "history", "status"),
+        "Purchase Order Change Request current PO status vouchers payments receipts History Summary sent to CFS completed",
     ),
     (
         ("marketplace",),
@@ -48,6 +78,29 @@ def build_retrieval_query(message: str) -> str:
 
 def generation_hint(message: str) -> str:
     lowered = message.casefold()
+    if "invoice" in lowered and any(
+        term in lowered for term in ("information", "include", "requirement", "required")
+    ):
+        return (
+            "Provide every supported invoice requirement or submission detail first. Clearly distinguish vendor-facing guidance "
+            "from internal voucher-entry fields, label the result non-exhaustive when the source does not claim completeness, "
+            "and escalate only the undocumented fields rather than refusing the whole question."
+        )
+    if (
+        any(term in lowered for term in ("supplier", "vendor"))
+        and any(term in lowered for term in ("invitation", "invite"))
+    ):
+        return (
+            "Use the documented invited-email decision tree: verify the invited address, distinguish the correct-address "
+            "and incorrect-address branches, then include the documented spam-filter escalation."
+        )
+    if "amazon" in lowered and any(
+        term in lowered for term in ("access", "account", "punchout")
+    ):
+        return (
+            "Explain how the CSUBUY profile email affects Amazon Business access. Include only account branches whose exact "
+            "conditions and actions appear in the excerpts; do not generalize one branch to every Amazon account state."
+        )
     if any(
         term in lowered
         for term in ("new supplier", "request a supplier", "cannot find a supplier")

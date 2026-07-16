@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://csub.example/schemas/response-scenarios.schema.json",
+  "title": "CSUB Procurement Assistant response acceptance suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "default_base_url", "defaults", "cases"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "name": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "default_base_url": {"type": "string", "format": "uri"},
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "citations_must_resolve": {"type": "boolean"},
+        "forbid_duplicate_source_ids": {"type": "boolean"},
+        "forbid_duplicate_source_paths": {"type": "boolean"},
+        "forbid_internal_sources": {"type": "boolean"},
+        "forbidden_source_path_prefixes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "forbidden_source_paths": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "nonEmptyStrings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "historyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "text"],
+      "properties": {
+        "role": {"enum": ["user", "assistant"]},
+        "text": {"type": "string", "minLength": 1}
+      }
+    },
+    "answerExpectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_chars": {"type": "integer", "minimum": 0},
+        "max_chars": {"type": "integer", "minimum": 1},
+        "contains_all": {"$ref": "#/$defs/nonEmptyStrings"},
+        "contains_any": {"$ref": "#/$defs/nonEmptyStrings"},
+        "contains_any_groups": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/nonEmptyStrings"}
+        },
+        "not_contains": {"$ref": "#/$defs/nonEmptyStrings"},
+        "regex_all": {"$ref": "#/$defs/nonEmptyStrings"},
+        "regex_any": {"$ref": "#/$defs/nonEmptyStrings"},
+        "not_regex": {"$ref": "#/$defs/nonEmptyStrings"},
+        "question_mark": {"type": "boolean"}
+      }
+    },
+    "sourceExpectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_count": {"type": "integer", "minimum": 0},
+        "max_count": {"type": "integer", "minimum": 0},
+        "path_contains_all": {"$ref": "#/$defs/nonEmptyStrings"},
+        "path_contains_any": {"$ref": "#/$defs/nonEmptyStrings"},
+        "path_not_contains": {"$ref": "#/$defs/nonEmptyStrings"},
+        "citations_required": {"type": "boolean"},
+        "timestamps_required": {"type": "boolean"},
+        "source_urls_required": {"type": "boolean"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "severity", "tags", "request", "expect"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "description": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["blocker", "high", "medium", "low"]},
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "enabled": {"type": "boolean"},
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["message", "role"],
+          "properties": {
+            "message": {"type": "string", "minLength": 1, "maxLength": 4000},
+            "role": {"enum": ["requester", "vendor", "internal_staff"]},
+            "history": {
+              "type": "array",
+              "maxItems": 6,
+              "items": {"$ref": "#/$defs/historyItem"}
+            }
+          }
+        },
+        "expect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["answer", "sources"],
+          "properties": {
+            "http_status": {"type": "integer", "minimum": 100, "maximum": 599},
+            "max_latency_seconds": {"type": "number", "exclusiveMinimum": 0},
+            "answer": {"$ref": "#/$defs/answerExpectations"},
+            "sources": {"$ref": "#/$defs/sourceExpectations"}
+          }
+        }
+      }
+    }
+  }
+}
