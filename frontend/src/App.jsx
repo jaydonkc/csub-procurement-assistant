@@ -294,8 +294,7 @@ function SourcePanel({ source, onClose }) {
     player.currentTime = Math.min(range.start, lastSeekableSecond)
   }
 
-  function showCaptions(event) {
-    event.currentTarget.track.mode = 'showing'
+  function markCaptionsReady() {
     setCaptionState('ready')
   }
 
@@ -353,8 +352,7 @@ function SourcePanel({ source, onClose }) {
                     src={source.caption_url}
                     srcLang="en"
                     label="English"
-                    default
-                    onLoad={showCaptions}
+                    onLoad={markCaptionsReady}
                     onError={() => setCaptionState('error')}
                   />
                 )}
