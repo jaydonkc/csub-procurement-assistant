@@ -6,11 +6,11 @@ Status: the public frontend, backend, and production agent behavior were verifie
 
 - Lambda: `csub-pa-mvp-chat-test`
 - Alias: `production`
-- Version: `14`
+- Version: `18`
 - API base URL: `https://w0vfga8dil.execute-api.us-west-2.amazonaws.com/prod`
 - Chat: `POST /v1/chat`
 - Health: `GET /v1/health`
-- Immediate predecessor: `13`; versions `10`-`14` retain conditional retrieval, grounded guidance, and expiring source links; version `8` retains the first document/video source-link implementation
+- Retained rollback versions: `14`-`17`; version `18` adds role-aware escalation routing, per-role frontend conversations, and the permanent New chat control while retaining conditional retrieval, grounded guidance, and expiring source links
 - Knowledge Base: `3MMHDI5IDU`
 - Generation: US Anthropic Claude Sonnet 4.6
 - Validation: US Anthropic Claude Haiku 4.5
@@ -62,7 +62,7 @@ The development implementation reorganizes the backend without changing the prod
 - Request classification, guided clarification, Knowledge Base retrieval, public-source filtering, source caps, source-verified workflow templates, and S3 URL signing remain deterministic application code.
 - Retrieval is performed before model execution and is not exposed as a model-optional tool.
 
-This Pydantic path is deployed to the frozen `production` alias. Its local suite passes 83/83 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites should be rerun before any future alias move.
+This Pydantic path is deployed to the frozen `production` alias. Its local suite passes 86/86 focused tests, including retrieval routing, valid-audit, retry-exhaustion, structured-audit-rejection, verdict-consistency, cited-source filtering, escalation routing, and handler fallback coverage. The full live 36-scenario retrieval and 13-scenario guided end-to-end suites should be rerun before any future alias move.
 
 ## Acceptance Results
 
@@ -72,7 +72,7 @@ Final post-deployment run through API Gateway and WAF:
 - Guided end to end: 13/13 HTTP successes, 13/13 expected-source hits, 13/13 valid citation sets, 0 internal leaks, 0 duplicate source cards, 3/3 timestamp checks, 9.215-second p95.
 - Boundary and adversarial behavior: 8/8 passed.
 - Conditional retrieval/source-link live check: 9/9 routing scenarios passed; `hi` returned no sources in both the API and deployed UI; cited PDF and video links returned the correct content types.
-- Local policy/API suite: 78/78 passed.
+- Current focused local backend suite: 86/86 passed.
 
 The raw retrieval evaluation still records exact-source misses for supplier search and Marketplace end-user training, plus partial term coverage for the forms scenario. These are not hidden: the guided product suite passes because query routing, public-source enforcement, clarification, and source-verified workflows are part of the product being evaluated.
 
